@@ -5,8 +5,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write # required for gh skill publish --tag in cd.yaml (called workflow permissions cannot exceed caller)
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
 
 jobs:
   version:
@@ -41,5 +44,7 @@ jobs:
     needs: version
     if: needs.version.outputs.tag != ''
     uses: ./.github/workflows/cd.yaml
+    permissions:
+      contents: write
     with:
       tag: ${{ needs.version.outputs.tag }}

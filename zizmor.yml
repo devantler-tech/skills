@@ -1,4 +1,0 @@
-rules:
-  excessive-permissions:
-    ignore:
-      - release.yaml # contents: write is required at workflow level so the called workflow (cd.yaml) inherits the permission to create releases
