@@ -45,7 +45,7 @@ Both are generic and work with any `gh skill`-compatible skills repo — not jus
 
 ## Contributing
 
-This repository follows the [`agentskills.io`](https://agentskills.io) spec: skill directories live at the repository root and include a conformant `SKILL.md` at their root. Other top-level directories may exist for repository metadata or supporting content (e.g. `.github/`). Pull requests are validated by [`gh skill publish --dry-run`](.github/workflows/ci.yaml); releases are cut automatically by [semantic-release](https://semantic-release.gitbook.io/) on every push to `main` — [`cd.yaml`](.github/workflows/cd.yaml) uses [commit conventions](https://www.conventionalcommits.org/) to determine the next version and create a GitHub release, which then triggers [`release.yaml`](.github/workflows/release.yaml) to run `gh skill publish` against that tag.
+This repository follows the [`agentskills.io`](https://agentskills.io) spec: skill directories live at the repository root and include a conformant `SKILL.md` at their root. Other top-level directories may exist for repository metadata or supporting content (e.g. `.github/`). Pull requests are validated by [`gh skill publish --dry-run`](.github/workflows/ci.yaml); releases are cut automatically by [semantic-release](https://semantic-release.gitbook.io/) on every push to `main` — [`release.yaml`](.github/workflows/release.yaml) uses [commit conventions](https://www.conventionalcommits.org/) to determine the next version and create a GitHub release, which then triggers [`cd.yaml`](.github/workflows/cd.yaml) to run `gh skill publish` against that tag.
 
 See the [devantler-tech organization guidelines](https://github.com/devantler-tech/.github) for PR/issue templates and general contribution rules.
 
