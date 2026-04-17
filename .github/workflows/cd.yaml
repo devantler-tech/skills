@@ -1,0 +1,15 @@
+name: 🚀 CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  release:
+    name: Release
+    uses: devantler-tech/reusable-workflows/.github/workflows/create-release.yaml@9ec9792d6c140612f6b5bafa5dc786e751b5ff1a # v2.2.0
+    secrets:
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
