@@ -15,7 +15,7 @@ on:
         type: string
 
 concurrency:
-  group: "${{ github.workflow }}"
+  group: publish-skills
   cancel-in-progress: false
 
 permissions: {}
