@@ -1,0 +1,50 @@
+name: 🧪 CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  validate:
+    name: Validate skills
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+
+      - name: 📄 Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: 🔧 Ensure gh >= 2.90.0
+        env:
+          GH_MIN_VERSION: 2.90.0
+        run: |
+          if gh skill --help >/dev/null 2>&1; then
+            echo "Installed gh ($(gh --version | awk '/gh version/{print $3}')) already supports 'gh skill'."
+            exit 0
+          fi
+          tmp=$(mktemp -d)
+          curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_MIN_VERSION}/gh_${GH_MIN_VERSION}_linux_amd64.tar.gz" \
+            | tar -xzC "$tmp"
+          sudo install "$tmp/gh_${GH_MIN_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh
+          gh --version
+
+      - name: ✅ Validate skills (dry run)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh skill publish --dry-run
