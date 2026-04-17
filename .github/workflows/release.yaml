@@ -5,7 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: write # required for gh skill publish --tag in cd.yaml (called workflow permissions cannot exceed caller)
 
 jobs:
   version:
