@@ -45,7 +45,7 @@ Both are generic and work with any `gh skill`-compatible skills repo — not jus
 
 ## Contributing
 
-This repository follows the [`agentskills.io`](https://agentskills.io) spec: each top-level directory is a skill with a conformant `SKILL.md` at its root. Pull requests are validated by [`gh skill publish --dry-run`](.github/workflows/ci.yaml); releases are cut manually via the [release workflow](.github/workflows/release.yaml) (`workflow_dispatch` with a semver tag).
+This repository follows the [`agentskills.io`](https://agentskills.io) spec: skill directories live at the repository root and include a conformant `SKILL.md` at their root. Other top-level directories may exist for repository metadata or supporting content (e.g. `.github/`). Pull requests are validated by [`gh skill publish --dry-run`](.github/workflows/ci.yaml); releases are cut manually via the [release workflow](.github/workflows/release.yaml) (`workflow_dispatch` with a semver tag).
 
 See the [devantler-tech organization guidelines](https://github.com/devantler-tech/.github) for PR/issue templates and general contribution rules.
 
