@@ -42,4 +42,3 @@ jobs:
     uses: ./.github/workflows/cd.yaml
     with:
       tag: ${{ needs.version.outputs.tag }}
-    secrets: inherit
