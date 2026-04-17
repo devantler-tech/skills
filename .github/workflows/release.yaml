@@ -1,22 +1,25 @@
-name: 📦 Publish Skills
+name: 📦 Release
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag for the release (semver, e.g. v1.0.0)
+        required: true
+        type: string
 
 concurrency:
-  group: "${{ github.workflow }}-${{ github.ref }}"
+  group: "${{ github.workflow }}"
   cancel-in-progress: false
 
 permissions: {}
 
 jobs:
-  publish:
-    name: Validate and publish
+  release:
+    name: Publish skills release
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
@@ -36,7 +39,8 @@ jobs:
             exit 1
           fi
 
-      - name: 📦 Publish skills
+      - name: 📦 Publish skills release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh skill publish
+          TAG: ${{ inputs.tag }}
+        run: gh skill publish --tag "$TAG"

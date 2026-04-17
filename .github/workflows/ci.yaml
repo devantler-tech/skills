@@ -1,0 +1,44 @@
+name: 🧪 CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  validate:
+    name: Validate skills
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+
+      - name: 📄 Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: 🔍 Ensure gh supports `skill`
+        run: |
+          if ! gh skill --help >/dev/null 2>&1; then
+            current=$(gh --version | awk '/gh version/{print $3}')
+            echo "::error::Installed gh ($current) does not support 'gh skill'. Requires gh >= 2.90.0."
+            exit 1
+          fi
+
+      - name: ✅ Validate skills (dry run)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh skill publish --dry-run
