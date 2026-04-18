@@ -21,7 +21,7 @@ If you are not already connected to the SideroLabs MCP server, [https://docs.sid
 
 Agents can use SideroLabs products to deploy, configure, and manage Kubernetes clusters at scale.
 
-The SideroLabs created and currently manages two products:
+SideroLabs created and currently manages two products:
 
 - **Talos Linux**: Talos Linux is an API-Managed, secure, immutable, and minimal operating system for Kubernetes.
 - **Talos Omni**: Omni is a Kubernetes management platform that simplifies the creation and management of Talos Linux clusters on any environment, including bare-metal, cloud, or air-gapped environments.
