@@ -95,6 +95,12 @@ skills:
     ref: "main"
     commit: "8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c"
     tree: "01cfb6a412faf9d680880cc3f631c419121a9916"
+  siderolabs:
+    repo: "siderolabs/docs"
+    path: "public/skill.md"
+    ref: "main"
+    commit: "e48b1205fb6c54c6cb04ffea6a88a8e3fd5afda0"
+    tree: "d6040b4a93661122c63b25cb802ab1e6fe1787fe"
   test-driven-development:
     repo: "obra/superpowers"
     path: "skills/test-driven-development"
