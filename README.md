@@ -16,12 +16,13 @@ Run `gh skill --help` for the full flag reference (`--agent`, `--scope`, etc.).
 
 ## Automated installation and updates
 
-To adopt these skills in another repository, use either of the following building blocks:
+To adopt these skills in another repository, use any of the following building blocks:
 
 - [`devantler-tech/actions/setup-copilot-skills`](https://github.com/devantler-tech/actions/tree/main/setup-copilot-skills) — composite action that installs skills from a `skills-lock.json` manifest or from an inline list.
-- [`devantler-tech/reusable-workflows/.github/workflows/update-copilot-skills.yaml`](https://github.com/devantler-tech/reusable-workflows/blob/main/.github/workflows/update-copilot-skills.yaml) — reusable workflow that installs and opens a PR with any skill updates on a schedule.
+- [`devantler-tech/actions/update-copilot-skills`](https://github.com/devantler-tech/actions/tree/main/update-copilot-skills) — composite action that resolves each source's latest tag/default-branch HEAD and writes the new `ref` + `digest` back into `skills-lock.json` for reproducible installs.
+- [`devantler-tech/reusable-workflows/.github/workflows/update-copilot-skills.yaml`](https://github.com/devantler-tech/reusable-workflows/blob/main/.github/workflows/update-copilot-skills.yaml) — reusable workflow that chains the two actions above and opens a PR with any skill updates on a schedule.
 
-Both are generic and work with any `gh skill`-compatible skills repo — not just this one.
+All three are generic and work with any `gh skill`-compatible skills repo — not just this one.
 
 ## Skills
 
