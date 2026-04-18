@@ -9,9 +9,7 @@ metadata:
   mintlify-proj: siderolabs
 ---
 
-import { VersionWarningBanner } from "/snippets/version-warning-banner.jsx"
-
-<VersionWarningBanner />
+> **Version notice:** Verify the Talos and Omni documentation links in this file against the currently supported versions before following version-specific guidance.
 
 # SideroLabs best practices
 
@@ -95,15 +93,15 @@ curl -sL https://talos.dev/install-omnictl | sh
 5. Sync declared state to Omni: `omnictl cluster template sync -f <template.yaml>`
 6. Fetch kubeconfig: `omnictl kubeconfig -c <cluster-name>`
 7. Download talosconfig: `omnictl talosconfig --cluster <cluster-name>`
-8. Merge `talosconfig` and `kubeconfig` configuration: 
-  ```bash
-     # Merge Talos configuration
-      talosctl config merge $HOME/Downloads/talosconfig.yaml
+8. Merge `talosconfig` and `kubeconfig` configuration:
+   ```bash
+   # Merge Talos configuration
+   talosctl config merge $HOME/Downloads/talosconfig.yaml
 
-     # Merge kubeconfig (combine and flatten)
-     export KUBECONFIG=~/.kube/config:$HOME/Downloads/talos-default-kubeconfig.yaml
-     kubectl config view --flatten > ~/.kube/config
-  ```
+   # Merge kubeconfig (combine and flatten)
+   export KUBECONFIG=~/.kube/config:$HOME/Downloads/talos-default-kubeconfig.yaml
+   kubectl config view --flatten > ~/.kube/config
+   ```
 9. Verify nodes:  `kubectl get nodes`
 
 ## CLI reference
@@ -112,7 +110,7 @@ curl -sL https://talos.dev/install-omnictl | sh
 
 - `talosctl logs <service>` - view service logs
 - `talosctl upgrade --image <installer-image>` - upgrade Talos
-- `talosctl patch mc --nodes <IP> -p <json>` - patch machine configuration
+- `talosctl patch machineconfig --nodes <IP> -p <json>` - patch machine configuration
 - `talosctl rollback` - rollback OS version
 - `talosctl reset` - **destructive** wipe; requires explicit warning
 
@@ -139,7 +137,7 @@ Here are some omnictl commands and their uses:
 ## Common gotchas (things agents must not mess up)
 
 1. **No SSH on Talos.** Never suggest SSH or SSH-based commands.
-2. **No in-node file edits.** Never reference `/etc`, `/var`, config files, editors, or shell sessions.
+2. **No in-node file edits.** Never suggest editing `/etc`, `/var`, or other files on Talos nodes, and never reference editors or shell sessions on Talos nodes. Local editing on the operator machine is OK when using supported API-driven workflows such as `talosctl`.
 3. **No package managers.** Talos does not support apt, yum, apk, pacman, etc.
 4. **No kubeadm.** Talos does not use kubeadm for initialization or upgrades.
 5. **Bootstrap is one-time.** Never suggest retry loops or re-running bootstrap unless explicitly recovering from a failed creation.
@@ -173,7 +171,7 @@ Here are some omnictl commands and their uses:
 - Apply machine configuration via `talosctl apply-config`
 - Edit machine configuration with `talosctl edit machineconfig` using interactive editor
 - Apply JSON patches to machine configuration with `talosctl patch machineconfig`
-- Retrieve current configuration with `talosctl get machineconfig`
+- Retrieve current machine configuration with `talosctl get machineconfig`
 - Support for immediate configuration updates without reboot for networking, logging, kubelet, kernel args, and more
 - Reproducible machine configuration for consistent deployments
 

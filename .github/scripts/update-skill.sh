@@ -102,13 +102,20 @@ root=$(tar -tzf "$tmp/src.tar.gz" | head -1 | cut -d/ -f1)
 mkdir -p "$tmp/src"
 tar -xzf "$tmp/src.tar.gz" -C "$tmp/src" --strip-components=1 "$root/$path"
 src="$tmp/src/$path"
-[[ -d "$src" ]] || { echo "    path '$path' not found in tarball" >&2; exit 1; }
 
 dest="$repo_root/$skill"
 echo "    mirroring $path -> $skill/"
 rm -rf "$dest"
 mkdir -p "$dest"
-( cd "$src" && tar -cf - . ) | ( cd "$dest" && tar -xf - )
+
+if [[ -d "$src" ]]; then
+  ( cd "$src" && tar -cf - . ) | ( cd "$dest" && tar -xf - )
+elif [[ -f "$src" ]]; then
+  # Single-file source: copy as SKILL.md (the agentskills.io convention).
+  cp "$src" "$dest/SKILL.md"
+else
+  echo "    path '$path' not found in tarball" >&2; exit 1
+fi
 
 echo "    bumping lock file"
 SKILL="$skill" COMMIT="$new_commit" TREE="$new_tree" yq -i '
