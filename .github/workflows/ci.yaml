@@ -113,4 +113,6 @@ jobs:
             "skills-ref @ git+https://github.com/agentskills/agentskills.git@${AGENTSKILLS_REF}#subdirectory=skills-ref"
 
       - name: ✅ Validate ${{ matrix.skill }} against agentskills.io spec
-        run: skills-ref validate "${{ matrix.skill }}"
+        env:
+          SKILL: ${{ matrix.skill }}
+        run: skills-ref validate "$SKILL"
