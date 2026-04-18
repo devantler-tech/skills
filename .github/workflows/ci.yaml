@@ -48,3 +48,69 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh skill publish --dry-run
+
+  discover-skills:
+    name: Discover skills
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      skills: ${{ steps.list.outputs.skills }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+
+      - name: 📄 Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: 📂 List skill directories
+        id: list
+        run: |
+          skills=$(find . -mindepth 2 -maxdepth 2 -name SKILL.md -printf '%h\n' \
+            | sed 's|^\./||' \
+            | sort \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "skills=$skills" >> "$GITHUB_OUTPUT"
+          echo "Discovered: $skills"
+
+  validate-spec:
+    name: Validate spec (${{ matrix.skill }})
+    needs: discover-skills
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        skill: ${{ fromJson(needs.discover-skills.outputs.skills) }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+
+      - name: 📄 Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: 📦 Install skills-ref
+        env:
+          # Pin to a specific commit of agentskills/agentskills for reproducible installs.
+          # https://github.com/agentskills/agentskills/tree/main/skills-ref
+          AGENTSKILLS_REF: 8d8fcbc69e0c42e05922c2ffc287a3bbdef7b0a3
+        run: |
+          python -m pip install --disable-pip-version-check \
+            "skills-ref @ git+https://github.com/agentskills/agentskills.git@${AGENTSKILLS_REF}#subdirectory=skills-ref"
+
+      - name: ✅ Validate ${{ matrix.skill }} against agentskills.io spec
+        run: skills-ref validate "${{ matrix.skill }}"
