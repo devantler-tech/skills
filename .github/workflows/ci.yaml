@@ -74,6 +74,10 @@ jobs:
             | sed 's|^\./||' \
             | sort \
             | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          if ! jq -e 'length > 0' >/dev/null 2>&1 <<<"$skills"; then
+            echo "::error::No skills were discovered. Ensure skill directories contain SKILL.md at the expected path and that discovery logic is working."
+            exit 1
+          fi
           echo "skills=$skills" >> "$GITHUB_OUTPUT"
           echo "Discovered: $skills"
 
