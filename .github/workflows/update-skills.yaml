@@ -69,6 +69,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          # persist-credentials is kept enabled (default) because this job
+          # creates a branch and pushes it later in the same job.
+          persist-credentials: true
 
       - name: 🔧 Install yq
         env:
@@ -96,7 +99,9 @@ jobs:
         id: sync
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./.github/scripts/update-skill.sh "${{ matrix.skill }}"
+          # Pass via env to avoid template injection in the shell command.
+          SKILL: ${{ matrix.skill }}
+        run: ./.github/scripts/update-skill.sh "$SKILL"
 
       - name: ✅ Validate skill against agentskills.io spec
         if: steps.sync.outputs.changed == 'true'

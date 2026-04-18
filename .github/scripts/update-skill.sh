@@ -16,7 +16,7 @@
 # This mirrors the content-addressed change detection used by `gh skill update`
 # (see https://github.blog/changelog/2026-04-16-manage-agent-skills-with-github-cli/).
 #
-# Dependencies: gh, yq (mikefarah), jq, tar.
+# Dependencies: gh, yq (mikefarah), tar.
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
@@ -25,10 +25,17 @@ if [[ $# -ne 1 ]]; then
 fi
 
 skill="$1"
+
+# Guard against path traversal: skill names must be plain directory names.
+if [[ "$skill" == */* || "$skill" == *..* || "$skill" == /* ]]; then
+  echo "invalid skill name: '$skill'" >&2
+  exit 2
+fi
+
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 lock="${repo_root}/skills-lock.yaml"
 
-for bin in gh yq jq tar; do
+for bin in gh yq tar; do
   command -v "$bin" >/dev/null || { echo "missing dependency: $bin" >&2; exit 127; }
 done
 
