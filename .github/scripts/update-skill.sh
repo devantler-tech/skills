@@ -4,13 +4,17 @@
 # Usage: .github/scripts/update-skill.sh <skill-name>
 #
 # Behaviour:
-#   1. Read {repo, path, ref, sha} for <skill-name> from skills-lock.yaml.
-#   2. Resolve HEAD commit SHA of <ref> on <repo> via `gh api`.
-#   3. If new SHA == current SHA, exit 0 with no changes.
-#   4. Download the tarball at the new SHA, mirror <path>/ into ./<skill-name>/.
-#   5. Bump the `sha` field in skills-lock.yaml.
-#   6. Emit GitHub Actions outputs (`changed`, `old_sha`, `new_sha`, `repo`) if
-#      $GITHUB_OUTPUT is set.
+#   1. Read {repo, path, ref, commit, tree} for <skill-name> from skills-lock.yaml.
+#   2. Resolve the upstream tree SHA for <path> at <ref> via `gh api`.
+#   3. If the tree SHA matches the lock, exit 0 with no changes — the skill's
+#      content is unchanged even if new commits landed on the upstream repo.
+#   4. Otherwise resolve the new commit SHA, download that tarball, mirror
+#      <path>/ into ./<skill-name>/, and bump `commit` + `tree` in the lock.
+#   5. Emit GitHub Actions outputs (`changed`, `repo`, `old_commit`, `new_commit`,
+#      `old_tree`, `new_tree`) if $GITHUB_OUTPUT is set.
+#
+# This mirrors the content-addressed change detection used by `gh skill update`
+# (see https://github.blog/changelog/2026-04-16-manage-agent-skills-with-github-cli/).
 #
 # Dependencies: gh, yq (mikefarah), jq, tar.
 set -euo pipefail
@@ -30,10 +34,9 @@ done
 
 [[ -f "$lock" ]] || { echo "skills-lock.yaml not found at $lock" >&2; exit 1; }
 
-repo=$(yq -r ".skills.\"$skill\".repo // \"\"" "$lock")
-path=$(yq -r ".skills.\"$skill\".path // \"\"" "$lock")
-ref=$(yq  -r ".skills.\"$skill\".ref  // \"\"" "$lock")
-old_sha=$(yq -r ".skills.\"$skill\".sha  // \"\"" "$lock")
+get() { yq -r ".skills.\"$skill\".$1 // \"\"" "$lock"; }
+repo=$(get repo); path=$(get path); ref=$(get ref)
+old_commit=$(get commit); old_tree=$(get tree)
 
 if [[ -z "$repo" || -z "$path" || -z "$ref" ]]; then
   echo "skill '$skill' missing from $lock or has empty fields" >&2
@@ -41,9 +44,24 @@ if [[ -z "$repo" || -z "$path" || -z "$ref" ]]; then
 fi
 
 echo "==> $skill: $repo@$ref ($path)"
-new_sha=$(gh api "/repos/$repo/commits/$ref" -q '.sha')
-echo "    old: ${old_sha:-<none>}"
-echo "    new: $new_sha"
+
+# Resolve the tree SHA of `path` at the tip of `ref`. For nested paths, the
+# contents API on the parent directory is the cheapest single-call option.
+parent=$(dirname "$path"); leaf=$(basename "$path")
+if [[ "$parent" == "." ]]; then
+  new_tree=$(gh api "repos/$repo/git/trees/$ref" -q ".tree[] | select(.path==\"$leaf\") | .sha")
+else
+  new_tree=$(gh api "repos/$repo/contents/$parent?ref=$ref" \
+    -q ".[] | select(.name==\"$leaf\") | .sha")
+fi
+
+if [[ -z "$new_tree" ]]; then
+  echo "    path '$path' not found on $repo@$ref" >&2
+  exit 1
+fi
+
+echo "    old tree: ${old_tree:-<none>}"
+echo "    new tree: $new_tree"
 
 emit_output() {
   [[ -n "${GITHUB_OUTPUT:-}" ]] || return 0
@@ -51,40 +69,45 @@ emit_output() {
 }
 
 emit_output repo "$repo"
-emit_output old_sha "$old_sha"
-emit_output new_sha "$new_sha"
+emit_output old_commit "$old_commit"
+emit_output old_tree "$old_tree"
+emit_output new_tree "$new_tree"
 
-if [[ "$new_sha" == "$old_sha" ]]; then
-  echo "    up to date"
+if [[ "$new_tree" == "$old_tree" ]]; then
+  echo "    up to date (content unchanged)"
   emit_output changed "false"
   exit 0
 fi
+
+new_commit=$(gh api "repos/$repo/commits/$ref" -q '.sha')
+emit_output new_commit "$new_commit"
+echo "    new commit: $new_commit"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 echo "    fetching tarball"
-gh api "/repos/$repo/tarball/$new_sha" > "$tmp/src.tar.gz"
+gh api "repos/$repo/tarball/$new_commit" > "$tmp/src.tar.gz"
 
-# Tarball root is "<owner>-<repo>-<short-sha>/"; discover it and strip.
 root=$(tar -tzf "$tmp/src.tar.gz" | head -1 | cut -d/ -f1)
 [[ -n "$root" ]] || { echo "    empty tarball" >&2; exit 1; }
 
-src="$tmp/src/$path"
 mkdir -p "$tmp/src"
 tar -xzf "$tmp/src.tar.gz" -C "$tmp/src" --strip-components=1 "$root/$path"
-
+src="$tmp/src/$path"
 [[ -d "$src" ]] || { echo "    path '$path' not found in tarball" >&2; exit 1; }
 
 dest="$repo_root/$skill"
 echo "    mirroring $path -> $skill/"
 rm -rf "$dest"
 mkdir -p "$dest"
-# Copy contents (including dotfiles) while excluding the directory self-link.
 ( cd "$src" && tar -cf - . ) | ( cd "$dest" && tar -xf - )
 
 echo "    bumping lock file"
-SKILL="$skill" NEW_SHA="$new_sha" yq -i '.skills[strenv(SKILL)].sha = strenv(NEW_SHA)' "$lock"
+SKILL="$skill" COMMIT="$new_commit" TREE="$new_tree" yq -i '
+  .skills[strenv(SKILL)].commit = strenv(COMMIT)
+  | .skills[strenv(SKILL)].tree = strenv(TREE)
+' "$lock"
 
 emit_output changed "true"
 echo "    done"
