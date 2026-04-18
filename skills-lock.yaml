@@ -83,6 +83,24 @@ skills:
     ref: "main"
     commit: "8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c"
     tree: "44219c182a1435252a1751313b99fb0a79882bb5"
+  gitops-cluster-debug:
+    repo: "fluxcd/agent-skills"
+    path: "skills/gitops-cluster-debug"
+    ref: "main"
+    commit: "76475b58c0df3fc4d180e9fd57d027724df872fe"
+    tree: "f1463d4de7168c3561f680a2613c3b68578f09ca"
+  gitops-knowledge:
+    repo: "fluxcd/agent-skills"
+    path: "skills/gitops-knowledge"
+    ref: "main"
+    commit: "76475b58c0df3fc4d180e9fd57d027724df872fe"
+    tree: "31faa863a7f6f24ef0b6259f4e6ea6c4e1a87ea9"
+  gitops-repo-audit:
+    repo: "fluxcd/agent-skills"
+    path: "skills/gitops-repo-audit"
+    ref: "main"
+    commit: "76475b58c0df3fc4d180e9fd57d027724df872fe"
+    tree: "6a0bce48f3bda341fce4ad2c4c798b40b40b98c4"
   golang-pro:
     repo: "Jeffallan/claude-skills"
     path: "skills/golang-pro"
