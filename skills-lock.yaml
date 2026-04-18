@@ -1,0 +1,82 @@
+# skills-lock.yaml — upstream sources for third-party skills in this repo.
+# The `update-skills` workflow reads this file, resolves the HEAD of each
+# skill's `ref`, and opens one pull request per changed skill. `sha` is
+# updated by the workflow; hand-edit `repo`, `path`, or `ref` to change
+# upstream. See .github/workflows/update-skills.yaml.
+version: 1
+skills:
+  astro:
+    repo: astrolicious/agent-skills
+    path: skills/astro
+    ref: main
+    sha: cb4839f3794189ebf35c55d3ba5d3876dff7acf0
+  bubbletea:
+    repo: ggprompts/tfe
+    path: .claude/skills/bubbletea
+    ref: main
+    sha: 71fd519836d0126f1f8545bdcff51dba92a5dba4
+  copilot-instructions-blueprint-generator:
+    repo: github/awesome-copilot
+    path: skills/copilot-instructions-blueprint-generator
+    ref: main
+    sha: 8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c
+  copilot-sdk:
+    repo: github/awesome-copilot
+    path: skills/copilot-sdk
+    ref: main
+    sha: 8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c
+  find-skills:
+    repo: vercel-labs/skills
+    path: skills/find-skills
+    ref: main
+    sha: bc21a37a12b90fcb5aec051c91baf5b227b704b1
+  frontend-design:
+    repo: anthropics/skills
+    path: skills/frontend-design
+    ref: main
+    sha: 2c7ec5e78b8e5d43ea02e90bb8826f6b9f147b0c
+  gh-cli:
+    repo: github/awesome-copilot
+    path: skills/gh-cli
+    ref: main
+    sha: 8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c
+  gh-stack:
+    repo: github/gh-stack
+    path: skills/gh-stack
+    ref: main
+    sha: 5c1fe16868c5a6e55ab008b111b1dcfab0967b2b
+  git-commit:
+    repo: github/awesome-copilot
+    path: skills/git-commit
+    ref: main
+    sha: 8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c
+  github-actions-docs:
+    repo: xixu-me/skills
+    path: skills/github-actions-docs
+    ref: main
+    sha: 15caf2fcb09614749c8a4666d577021fe00712cc
+  github-issues:
+    repo: github/awesome-copilot
+    path: skills/github-issues
+    ref: main
+    sha: 8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c
+  golang-pro:
+    repo: Jeffallan/claude-skills
+    path: skills/golang-pro
+    ref: main
+    sha: 5b761018cebd430edcecbeeb46bdde6150d22c65
+  refactor:
+    repo: github/awesome-copilot
+    path: skills/refactor
+    ref: main
+    sha: 8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c
+  test-driven-development:
+    repo: obra/superpowers
+    path: skills/test-driven-development
+    ref: main
+    sha: b55764852ac78870e65c6565fb585b6cd8b3c5c9
+  web-design-guidelines:
+    repo: vercel-labs/agent-skills
+    path: skills/web-design-guidelines
+    ref: main
+    sha: ce3e64e468f8fa09a2d075d102771838061fdac0

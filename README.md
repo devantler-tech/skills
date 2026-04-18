@@ -49,6 +49,10 @@ This repository follows the [`agentskills.io`](https://agentskills.io) spec: ski
 
 See the [devantler-tech organization guidelines](https://github.com/devantler-tech/.github) for PR/issue templates and general contribution rules.
 
+### Upstream sync
+
+Each skill is a vendored copy of a third-party skill. Their upstream sources are pinned in [`skills-lock.yaml`](skills-lock.yaml), and [`update-skills.yaml`](.github/workflows/update-skills.yaml) runs weekly to open one pull request per changed skill.
+
 ## License
 
 Apache 2.0 — see [`LICENSE`](LICENSE). Individual skills may carry their own notices (e.g. [`frontend-design/LICENSE.txt`](frontend-design/LICENSE.txt)).
