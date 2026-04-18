@@ -1,0 +1,109 @@
+# skills-lock.yaml — upstream sources for the third-party skills in this repo.
+#
+# The `update-skills` workflow reads this file and opens a pull request for
+# each skill whose upstream *content* has changed, using the tree SHA of the
+# skill's source directory for content-addressed change detection (matching
+# the scheme `gh skill` uses internally — see
+# https://github.blog/changelog/2026-04-16-manage-agent-skills-with-github-cli/).
+#
+# Fields per skill:
+#   repo   — owner/name of the upstream GitHub repository.
+#   path   — path to the skill directory within that repository.
+#   ref    — branch, tag, or commit ref to follow for updates.
+#   commit — commit SHA last synced; used for the compare URL in PRs.
+#   tree   — tree SHA of <path> at <commit>; used to detect real content changes.
+#
+# Hand-edit `repo`, `path`, or `ref` to change upstream; `commit` and `tree`
+# are bumped by the workflow.
+version: 1
+skills:
+  astro:
+    repo: "astrolicious/agent-skills"
+    path: "skills/astro"
+    ref: "main"
+    commit: "cb4839f3794189ebf35c55d3ba5d3876dff7acf0"
+    tree: "81d96cec5008970ed8fbecb23f7fb48536102b84"
+  bubbletea:
+    repo: "ggprompts/tfe"
+    path: ".claude/skills/bubbletea"
+    ref: "main"
+    commit: "71fd519836d0126f1f8545bdcff51dba92a5dba4"
+    tree: "b3dceb6065a02f1960f92483d9f44a1c2e4e36aa"
+  copilot-instructions-blueprint-generator:
+    repo: "github/awesome-copilot"
+    path: "skills/copilot-instructions-blueprint-generator"
+    ref: "main"
+    commit: "8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c"
+    tree: "a67fccf32fc28eda70e5868e65e61e2fce3e64ef"
+  copilot-sdk:
+    repo: "github/awesome-copilot"
+    path: "skills/copilot-sdk"
+    ref: "main"
+    commit: "8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c"
+    tree: "03696d18ae6c8e50683f4c66dc7e9bf0d51d9214"
+  find-skills:
+    repo: "vercel-labs/skills"
+    path: "skills/find-skills"
+    ref: "main"
+    commit: "bc21a37a12b90fcb5aec051c91baf5b227b704b1"
+    tree: "3013fdeb8a11b10b1eb795ec3ae8bfca38f7c26d"
+  frontend-design:
+    repo: "anthropics/skills"
+    path: "skills/frontend-design"
+    ref: "main"
+    commit: "2c7ec5e78b8e5d43ea02e90bb8826f6b9f147b0c"
+    tree: "928950704df8a8b885c03de5da626331e6f29cf8"
+  gh-cli:
+    repo: "github/awesome-copilot"
+    path: "skills/gh-cli"
+    ref: "main"
+    commit: "8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c"
+    tree: "437437f7f20bcdbbdb3081cf164435a388c0a39a"
+  gh-stack:
+    repo: "github/gh-stack"
+    path: "skills/gh-stack"
+    ref: "main"
+    commit: "5c1fe16868c5a6e55ab008b111b1dcfab0967b2b"
+    tree: "f900e01d90dd042162d0632dc31ee9541dd07841"
+  git-commit:
+    repo: "github/awesome-copilot"
+    path: "skills/git-commit"
+    ref: "main"
+    commit: "8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c"
+    tree: "883a6a7466f55a9cd9f22cf1cce2d9333fc9b998"
+  github-actions-docs:
+    repo: "xixu-me/skills"
+    path: "skills/github-actions-docs"
+    ref: "main"
+    commit: "15caf2fcb09614749c8a4666d577021fe00712cc"
+    tree: "518c85da555f91c346813aa5bb3cc62f9db8bfb3"
+  github-issues:
+    repo: "github/awesome-copilot"
+    path: "skills/github-issues"
+    ref: "main"
+    commit: "8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c"
+    tree: "44219c182a1435252a1751313b99fb0a79882bb5"
+  golang-pro:
+    repo: "Jeffallan/claude-skills"
+    path: "skills/golang-pro"
+    ref: "main"
+    commit: "5b761018cebd430edcecbeeb46bdde6150d22c65"
+    tree: "21c16cca0eaf425259a5aebc2de99ee64807b500"
+  refactor:
+    repo: "github/awesome-copilot"
+    path: "skills/refactor"
+    ref: "main"
+    commit: "8fbf6c4a798df51d1d1d8fd37a1aa7e94203109c"
+    tree: "01cfb6a412faf9d680880cc3f631c419121a9916"
+  test-driven-development:
+    repo: "obra/superpowers"
+    path: "skills/test-driven-development"
+    ref: "main"
+    commit: "b55764852ac78870e65c6565fb585b6cd8b3c5c9"
+    tree: "98904a7d8e0e04b9bd46220b9b17298f45fe0b72"
+  web-design-guidelines:
+    repo: "vercel-labs/agent-skills"
+    path: "skills/web-design-guidelines"
+    ref: "main"
+    commit: "ce3e64e468f8fa09a2d075d102771838061fdac0"
+    tree: "3116f3e62dbd02b44a598b1aa690d2a8938e8f89"
