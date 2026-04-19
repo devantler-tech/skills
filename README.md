@@ -14,7 +14,7 @@ This repo is a **pointer list**, not a publisher. Each row below installs direct
 | `gitops-cluster-debug` | [`fluxcd/agent-skills`](https://github.com/fluxcd/agent-skills/tree/main/skills/gitops-cluster-debug) | `gh skill install fluxcd/agent-skills gitops-cluster-debug` |
 | `gitops-knowledge` | [`fluxcd/agent-skills`](https://github.com/fluxcd/agent-skills/tree/main/skills/gitops-knowledge) | `gh skill install fluxcd/agent-skills gitops-knowledge` |
 | `gitops-repo-audit` | [`fluxcd/agent-skills`](https://github.com/fluxcd/agent-skills/tree/main/skills/gitops-repo-audit) | `gh skill install fluxcd/agent-skills gitops-repo-audit` |
-| `siderolabs` | [`siderolabs/docs`](https://github.com/siderolabs/docs/blob/main/public/skill.md) | `gh skill install siderolabs/docs siderolabs` |
+| `siderolabs` | [`siderolabs/docs`](https://github.com/siderolabs/docs/tree/main/skills/siderolabs) | `gh skill install siderolabs/docs siderolabs` |
 
 </details>
 
