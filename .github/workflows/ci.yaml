@@ -47,7 +47,12 @@ jobs:
       - name: ✅ Validate skills (dry run)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh skill publish --dry-run
+        run: |
+          if ! find . -mindepth 2 -maxdepth 2 -name SKILL.md -print -quit | grep -q .; then
+            echo "No skills in this repo yet — skipping 'gh skill publish --dry-run'."
+            exit 0
+          fi
+          gh skill publish --dry-run
 
   discover-skills:
     name: Discover skills
@@ -74,8 +79,8 @@ jobs:
             | sed 's|^\./||' \
             | sort \
             | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          if ! jq -e 'type == "array" and length > 0' >/dev/null 2>&1 <<<"$skills"; then
-            echo "::error::Skill discovery output was empty or invalid. Ensure skill directories contain SKILL.md at the expected path and that discovery logic is working."
+          if ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$skills"; then
+            echo "::error::Skill discovery produced invalid output."
             echo "Raw output: $skills"
             exit 1
           fi
@@ -85,6 +90,7 @@ jobs:
   validate-spec:
     name: Validate spec (${{ matrix.skill }})
     needs: discover-skills
+    if: needs.discover-skills.outputs.skills != '[]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
