@@ -4,9 +4,6 @@ A curated index of generic [agent skills](https://agentskills.io) installable wi
 
 This repo is a **pointer list**, not a publisher. Each row below installs directly from its original upstream so `gh skill` records the true source in the skill's `SKILL.md` frontmatter (`metadata.github-repo`, `github-path`, `github-ref`, `github-tree-sha`) and `gh skill update --all` works natively — no lockfile, no sync bot, no custom metadata.
 
-> [!IMPORTANT]
-> **Migrating from `gh skill install devantler-tech/skills …`?** This repo used to re-host these skills under the [`v0.2.5`](https://github.com/devantler-tech/skills/releases/tag/v0.2.5) tag and earlier. Pinned installs against that tag continue to work. For fresh installs, use the `gh skill install` snippet in the **Install** column below, which points at each skill's true upstream.
-
 ## Skills
 
 <details open>
