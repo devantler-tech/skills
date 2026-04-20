@@ -141,23 +141,9 @@ jobs:
           egress-policy: audit
 
       - name: ✅ Verify required jobs passed
-        env:
-          RESULTS: |
-            validate=${{ needs.validate.result }}
-            discover-skills=${{ needs.discover-skills.result }}
-            validate-spec=${{ needs.validate-spec.result }}
-        run: |
-          echo "$RESULTS"
-          failed=0
-          while IFS='=' read -r job result; do
-            [ -z "$job" ] && continue
-            case "$job=$result" in
-              validate-spec=skipped) echo "✔ $job: $result (allowed)" ;;
-              *=success)            echo "✔ $job: $result" ;;
-              *)                    echo "✘ $job: $result"; failed=1 ;;
-            esac
-          done <<< "$RESULTS"
-          if [ "$failed" -eq 1 ]; then
-            echo "::error::One or more required jobs did not succeed."
-            exit 1
-          fi
+        uses: devantler-tech/actions/require-checks-in-pr@1f66c91d45d374ceac9fe830a783444ebc9be958 # v3.2.0
+        with:
+          job-results: >-
+            ${{ needs.validate.result }}
+            ${{ needs.discover-skills.result }}
+            ${{ needs.validate-spec.result }}
