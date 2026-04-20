@@ -127,3 +127,37 @@ jobs:
         env:
           SKILL: ${{ matrix.skill }}
         run: skills-ref validate "$SKILL"
+
+  ci-required-checks:
+    name: CI - Required Checks
+    if: always()
+    needs: [validate, discover-skills, validate-spec]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+
+      - name: ✅ Verify required jobs passed
+        env:
+          RESULTS: |
+            validate=${{ needs.validate.result }}
+            discover-skills=${{ needs.discover-skills.result }}
+            validate-spec=${{ needs.validate-spec.result }}
+        run: |
+          echo "$RESULTS"
+          failed=0
+          while IFS='=' read -r job result; do
+            [ -z "$job" ] && continue
+            case "$job=$result" in
+              validate-spec=skipped) echo "✔ $job: $result (allowed)" ;;
+              *=success)            echo "✔ $job: $result" ;;
+              *)                    echo "✘ $job: $result"; failed=1 ;;
+            esac
+          done <<< "$RESULTS"
+          if [ "$failed" -eq 1 ]; then
+            echo "::error::One or more required jobs did not succeed."
+            exit 1
+          fi
