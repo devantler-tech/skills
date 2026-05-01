@@ -83,6 +83,11 @@ Use **GitHub Flow**:
 
 ## CI/CD Pipeline
 
+Each repository has exactly two workflow files — `ci.yaml` and `cd.yaml`. Reusable logic is extracted into local GitHub Actions under `.github/actions/`:
+
+- **Composite actions** — for simple, self-contained steps.
+- **TypeScript actions** — for anything complex, because they are locally testable and avoid hard-to-read bash embedded in YAML.
+
 ### Application / Library Repositories
 
 | Event | What runs |
