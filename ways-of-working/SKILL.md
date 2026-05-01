@@ -99,7 +99,7 @@ Use **GitHub Flow**:
 
 ### Releases
 
-Releases are automated via a reusable `release.yaml` workflow triggered on `push` to `main`. The workflow calculates the next semver from [conventional commit](https://www.conventionalcommits.org/) history (`default_bump: none` — no release when commits carry no bump-worthy prefix). When a bump is warranted, the workflow creates the semver tag and GitHub release, which in turn triggers the CD pipeline above.
+Releases are automated via the [`devantler-tech/reusable-workflows/.github/workflows/create-release.yaml`](https://github.com/devantler-tech/reusable-workflows/blob/main/.github/workflows/create-release.yaml) reusable workflow. It runs [semantic-release](https://semantic-release.gitbook.io/) on `push` to `main`, calculates the next semver from [conventional commit](https://www.conventionalcommits.org/) history, and creates the tag + GitHub release — which in turn triggers the CD pipeline above.
 
 ## Data-Driven Improvement
 
