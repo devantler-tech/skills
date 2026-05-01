@@ -21,6 +21,7 @@ Development is agent-first — every change starts as a structured issue and flo
    - **Kata** — Improvement Kata for continuous improvement (problem → definition of awesome → target condition → actions).
 2. **Plan** — create a structured implementation plan from the issue before writing code.
 3. **Implement** — execute the plan following the practices in this skill (TDD, quality gates, GitHub Flow, CI/CD).
+4. **Manual test** — validate behavior hands-on before merging. Focus on UX: output must be well-presented and every piece of feedback (errors, warnings, prompts) must be actionable.
 
 ## Testing
 
