@@ -12,7 +12,7 @@ license: Apache-2.0
 
 ## Development Workflow
 
-Development is agent-first — every change starts as a structured issue and flows through plan → implement → review:
+Development is agent-first — every change starts as a structured issue and flows through issue → plan → implement → test:
 
 1. **Create an issue** using the [devantler-tech/.github issue templates](https://github.com/devantler-tech/.github/tree/main/.github/ISSUE_TEMPLATE):
    - **Feature** — user story with acceptance criteria.
