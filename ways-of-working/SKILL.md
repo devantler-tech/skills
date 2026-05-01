@@ -87,7 +87,7 @@ Use **GitHub Flow**:
 1. Create a feature branch from `main`.
 2. Open a pull request.
 3. Pass all CI checks.
-4. Merge via merge queue (`merge_group`).
+4. Merge via merge queue (`merge_group`) when the repository is configured for it; otherwise merge the pull request normally.
 
 ## CI/CD Pipeline
 

@@ -2,7 +2,7 @@
 
 A curated index of generic [agent skills](https://agentskills.io) installable with the [`gh skill`](https://github.blog/changelog/2026-04-16-manage-agent-skills-with-github-cli/) CLI (v2.90.0+).
 
-This repo is a **pointer list** and publisher of in-house skills. Each pointer row below installs directly from its original upstream so `gh skill` records the true source in the skill's `SKILL.md` frontmatter (`metadata.github-repo`, `github-path`, `github-ref`, `github-tree-sha`) and `gh skill update --all` works natively — no lockfile, no sync bot, no custom metadata.
+This repo is a **pointer list** and publisher of in-house skills. Each row below is either an in-house skill or installs directly from its original upstream so `gh skill` records the true source in the skill's `SKILL.md` frontmatter (`metadata.github-repo`, `github-path`, `github-ref`, `github-tree-sha`) and `gh skill update --all` works natively — no lockfile, no sync bot, no custom metadata.
 
 ## Skills
 
