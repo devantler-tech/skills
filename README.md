@@ -67,6 +67,7 @@ This repo is a **pointer list**, not a publisher. Each row below installs direct
 |-------|----------|---------|
 | `refactor` | [`github/awesome-copilot`](https://github.com/github/awesome-copilot/tree/main/skills/refactor) | `gh skill install github/awesome-copilot refactor` |
 | `test-driven-development` | [`obra/superpowers`](https://github.com/obra/superpowers/tree/main/skills/test-driven-development) | `gh skill install obra/superpowers test-driven-development` |
+| `ways-of-working` | [`devantler-tech/skills`](https://github.com/devantler-tech/skills/tree/main/ways-of-working) | `gh skill install devantler-tech/skills ways-of-working` |
 
 </details>
 
