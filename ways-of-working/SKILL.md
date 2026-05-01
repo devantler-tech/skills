@@ -25,13 +25,13 @@ Follow the [test-driven-development](https://github.com/obra/superpowers/tree/ma
 
 ### Platform Engineering Tests
 
-For platform engineering work the same categories apply, but the tooling shifts to [ksail](https://github.com/devantler-tech/ksail):
+For platform engineering work the same categories apply, but the tooling shifts to [ksail](https://github.com/devantler-tech/ksail). This lets you develop Kubernetes platforms in the same build → run → publish loop as application code:
 
-| Type | ksail equivalent |
-|------|-----------------|
-| Build / init | `ksail cluster init` |
-| Run / test | `ksail cluster create` |
-| Publish | `ksail workload push` (OCI artifacts) |
+| Type | ksail equivalent | What it does |
+|------|-----------------|--------------|
+| Build / init | `ksail cluster init` | Scaffold a new cluster configuration |
+| Run / test | `ksail cluster create` | Spin up the cluster locally (Docker) or on real infrastructure and verify workloads reconcile |
+| Publish | `ksail workload push` | Push Kubernetes manifests as OCI artifacts to a container registry |
 
 ## Code Quality Gates (CI)
 
