@@ -79,6 +79,10 @@ Use **GitHub Flow**:
 | `merge_group` | CD to **dev** — deploy to staging infrastructure (e.g. Hetzner). |
 | Semver tag (`vX.X.X`) | CD to **prod** — `ksail cluster update`, `ksail workload push`, `ksail workload reconcile`. |
 
+### Releases
+
+Releases are automated via a reusable `release.yaml` workflow triggered on `push` to `main`. The workflow calculates the next semver from [conventional commit](https://www.conventionalcommits.org/) history (`default_bump: none` — no release when commits carry no bump-worthy prefix). When a bump is warranted, the workflow creates the semver tag and GitHub release, which in turn triggers the CD pipeline above.
+
 ## Data-Driven Improvement
 
 - Use **benchmarking data** to guide performance improvements — don't optimise without numbers.
