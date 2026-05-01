@@ -29,24 +29,32 @@ Development is agent-first — every change starts as a structured issue and flo
 
 Follow the [test-driven-development](https://github.com/obra/superpowers/tree/main/skills/test-driven-development) skill rigorously — write the test first, watch it fail, write minimal code to pass.
 
-### Test Types
+### Application / Library Repositories
 
-| Type | Where to write | When to run |
-|------|---------------|-------------|
+| Type | Tooling | When to run |
+|------|---------|-------------|
 | **Unit tests** | SDK test frameworks (e.g. `go test`, `xunit`, `jest`) | CI on every PR |
 | **Integration tests** | SDK test frameworks | CI on every PR |
 | **E2E / system tests** | GitHub Actions workflows that exercise the app/binary/service as an end user would | CI on every PR; move to `merge_group` if the suite becomes too heavy |
 | **Benchmark tests** | SDK benchmark frameworks (e.g. `BenchmarkDotNet`, `go test -bench`) | CI on every PR |
 
-### Platform Engineering Tests
+### Platform / Kubernetes Repositories
 
-For platform engineering work the same categories apply, but the tooling shifts to [ksail](https://github.com/devantler-tech/ksail). This lets you develop Kubernetes platforms in the same build → run → publish loop as application code:
+For platform engineering work, [ksail](https://github.com/devantler-tech/ksail) provides the build → run → publish loop and [Testkube](https://testkube.io/) runs the actual test suites inside the cluster:
 
-| Type | ksail equivalent | What it does |
-|------|-----------------|--------------|
-| Build / init | `ksail cluster init` | Scaffold a new cluster configuration |
-| Run / test | `ksail cluster create` | Spin up the cluster locally (Docker) or on real infrastructure and verify workloads reconcile |
-| Publish | `ksail workload push` | Push Kubernetes manifests as OCI artifacts to a container registry |
+| Type | App-repo equivalent | Tooling | What it does |
+|------|---------------------|---------|--------------|
+| **Linting / scanning** | Unit tests | Standard linters & scanners (e.g. kubeconform, kube-linter, Trivy) | Validate manifests statically — no cluster needed |
+| **Integration tests** | Integration tests | Ephemeral local cluster (`ksail cluster create`) + Testkube | Spin up a Docker cluster, deploy workloads, and run Testkube test suites against them |
+| **E2E / system tests** | E2E / system tests | Ephemeral or real cluster + Testkube | Deploy to a full environment (local or remote) and run end-to-end Testkube test suites |
+
+Platform lifecycle commands:
+
+| Command | Purpose |
+|---------|---------|
+| `ksail cluster init` | Scaffold a new cluster configuration |
+| `ksail cluster create` | Spin up the cluster locally (Docker) or on real infrastructure and verify workloads reconcile |
+| `ksail workload push` | Push Kubernetes manifests as OCI artifacts to a container registry |
 
 ## Code Quality Gates (CI)
 
