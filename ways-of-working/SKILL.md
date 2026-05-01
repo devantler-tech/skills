@@ -109,7 +109,7 @@ Each repository has two core workflow files — `ci.yaml` and `cd.yaml` — plus
 
 | Event | What runs |
 |-------|-----------|
-| `pull_request` | Integration tests on an ephemeral local cluster (`ksail cluster create` + Testkube). Move to `merge_group` if the suite becomes too heavy. |
+| `pull_request` | Linting & scanning (kubeconform, kube-linter, Trivy, etc.) plus integration tests on an ephemeral local cluster (`ksail cluster create` + Testkube). Move integration tests to `merge_group` if the suite becomes too heavy. |
 | `merge_group` | CD to **dev** — deploy to staging infrastructure (e.g. Hetzner). |
 | Semver tag (`vX.X.X`) | CD to **prod** — `ksail cluster update`, `ksail workload push`, `ksail workload reconcile`. |
 
