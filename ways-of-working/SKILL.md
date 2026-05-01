@@ -55,6 +55,12 @@ Every pull request **must** pass:
 - **No code coverage regression** — coverage must not decrease compared to the base branch.
 - **No benchmark regression** — benchmark results must not regress compared to the base branch.
 
+## Problem Solving
+
+- **Fix at the root cause** — never patch symptoms. Trace every bug or failure to its origin and fix it there.
+- **Workarounds are always temporary** — if a workaround is unavoidable, mark it clearly (e.g. `// WORKAROUND:` comment with a linked issue) and schedule its removal.
+- **Upstream first** — when a fix belongs in a dependency or upstream project, contribute it there. Only carry a local patch until the upstream change is released.
+
 ## Libraries
 
 Prefer popular, well-maintained third-party libraries over writing custom implementations. Only roll your own when no suitable library exists or when the dependency would be disproportionately heavy.
