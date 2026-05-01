@@ -91,7 +91,7 @@ Use **GitHub Flow**:
 
 ## CI/CD Pipeline
 
-Each repository has exactly two workflow files — `ci.yaml` and `cd.yaml`. Reusable logic is extracted into local GitHub Actions under `.github/actions/`:
+Each repository has two core workflow files — `ci.yaml` and `cd.yaml` — plus a thin `release.yaml` that calls a reusable workflow (see [Releases](#releases)). Reusable logic is extracted into local GitHub Actions under `.github/actions/`:
 
 - **Composite actions** — for simple, self-contained steps.
 - **TypeScript actions** — for anything complex, because they are locally testable and avoid hard-to-read bash embedded in YAML.
@@ -105,11 +105,11 @@ Each repository has exactly two workflow files — `ci.yaml` and `cd.yaml`. Reus
 | `push` to `main` | **Publish** artifacts (packages, container images, etc.). |
 | Semver tag (`vX.X.X`) | CD to **prod** environment. |
 
-### Kubernetes / Platform Repositories
+### Platform / Kubernetes Repositories
 
 | Event | What runs |
 |-------|-----------|
-| `pull_request` | System test on a local Docker cluster (`ksail cluster create`). Move to `merge_group` if the suite becomes too heavy. |
+| `pull_request` | Integration tests on an ephemeral local cluster (`ksail cluster create` + Testkube). Move to `merge_group` if the suite becomes too heavy. |
 | `merge_group` | CD to **dev** — deploy to staging infrastructure (e.g. Hetzner). |
 | Semver tag (`vX.X.X`) | CD to **prod** — `ksail cluster update`, `ksail workload push`, `ksail workload reconcile`. |
 
