@@ -1,10 +1,11 @@
 ---
 name: ways-of-working
 description: >-
-  Codifies devantler-tech engineering practices: TDD, CI/CD pipelines,
-  GitHub Flow, benchmarking, code quality gates, and Kubernetes workflows
-  with ksail. Use when setting up new projects, configuring CI/CD,
-  writing tests, or making architectural decisions.
+  Codifies devantler-tech engineering practices: agent-first development
+  workflow, TDD, CI/CD pipelines, GitHub Flow, code quality gates,
+  and Kubernetes workflows with ksail. Use when filing issues, planning
+  work, setting up projects, configuring CI/CD, writing tests, debugging,
+  or making architectural decisions.
 license: Apache-2.0
 ---
 
@@ -12,7 +13,7 @@ license: Apache-2.0
 
 ## Development Workflow
 
-Development is agent-first — every change starts as a structured issue and flows through issue → plan → implement → test:
+Development is agent-first — every change starts as a structured issue and flows through issue → plan → implement → test → review:
 
 1. **Create an issue** using the [devantler-tech/.github issue templates](https://github.com/devantler-tech/.github/tree/main/.github/ISSUE_TEMPLATE):
    - **Feature** — user story with acceptance criteria.
@@ -22,6 +23,7 @@ Development is agent-first — every change starts as a structured issue and flo
 2. **Plan** — create a structured implementation plan from the issue before writing code.
 3. **Implement** — execute the plan following the practices in this skill (TDD, quality gates, GitHub Flow, CI/CD).
 4. **Manual test** — validate behavior hands-on before merging. Focus on UX: output must be well-presented and every piece of feedback (errors, warnings, prompts) must be actionable.
+5. **Code review** (optional) — CI's strict linting, scanning, and quality gates are the primary feedback loop, so manual review is not always required.
 
 ## Testing
 
