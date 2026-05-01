@@ -10,6 +10,18 @@ license: Apache-2.0
 
 # Ways of Working
 
+## Development Workflow
+
+Development is agent-first — every change starts as a structured issue and flows through plan → implement → review:
+
+1. **Create an issue** using the [devantler-tech/.github issue templates](https://github.com/devantler-tech/.github/tree/main/.github/ISSUE_TEMPLATE):
+   - **Feature** — user story with acceptance criteria.
+   - **Bug** — expected vs actual behavior with reproduction steps.
+   - **Chore** — user story with acceptance criteria for general tasks.
+   - **Kata** — Improvement Kata for continuous improvement (problem → definition of awesome → target condition → actions).
+2. **Plan** — create a structured implementation plan from the issue before writing code.
+3. **Implement** — execute the plan following the practices in this skill (TDD, quality gates, GitHub Flow, CI/CD).
+
 ## Testing
 
 Follow the [test-driven-development](https://github.com/obra/superpowers/tree/main/skills/test-driven-development) skill rigorously — write the test first, watch it fail, write minimal code to pass.
