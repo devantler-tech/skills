@@ -2,7 +2,7 @@
 
 A curated index of generic [agent skills](https://agentskills.io) installable with the [`gh skill`](https://github.blog/changelog/2026-04-16-manage-agent-skills-with-github-cli/) CLI (v2.90.0+).
 
-This repo is a **pointer list**, not a publisher. Each row below installs directly from its original upstream so `gh skill` records the true source in the skill's `SKILL.md` frontmatter (`metadata.github-repo`, `github-path`, `github-ref`, `github-tree-sha`) and `gh skill update --all` works natively — no lockfile, no sync bot, no custom metadata.
+This repo is a **pointer list** and publisher of in-house skills. Each pointer row below installs directly from its original upstream so `gh skill` records the true source in the skill's `SKILL.md` frontmatter (`metadata.github-repo`, `github-path`, `github-ref`, `github-tree-sha`) and `gh skill update --all` works natively — no lockfile, no sync bot, no custom metadata.
 
 ## Skills
 
@@ -98,7 +98,7 @@ All three rely on the `github-*` metadata that `gh skill install` injects into e
 
 This repository follows the [`agentskills.io`](https://agentskills.io) spec: skill directories live at the repository root and include a conformant `SKILL.md` at their root. Pull requests are validated by [`gh skill publish --dry-run`](.github/workflows/ci.yaml); releases are cut automatically by [semantic-release](https://semantic-release.gitbook.io/) on every push to `main` — [`release.yaml`](.github/workflows/release.yaml) uses [commit conventions](https://www.conventionalcommits.org/) to determine the next version, and [`cd.yaml`](.github/workflows/cd.yaml) then runs `gh skill publish` against the resulting tag.
 
-The publish pipeline is retained for future in-house skills; until one is added, releases are no-ops.
+The publish pipeline publishes in-house skills (e.g. `ways-of-working`) on each release.
 
 See the [devantler-tech organization guidelines](https://github.com/devantler-tech/.github) for PR/issue templates and general contribution rules.
 
