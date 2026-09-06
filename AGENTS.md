@@ -94,7 +94,8 @@ shellcheck scripts/*.sh
                                   # parsed count == Skills-table rows, every in-house skill indexed,
                                   # every in-house index entry resolves to an on-disk skill dir, and
                                   # every row's Install command agrees with its Skill name + Upstream
-                                  # link (cross-column consistency — no wrong-repo/slug install ships)
+                                  # link (cross-column consistency — no wrong-repo/slug install ships);
+                                  # distinct upstream repositories cannot share an installed skill name
 ./scripts/check-readme-index.test.sh   # self-test of the guard above (also in the lint-scripts gate):
                                        # proves it PASSES a consistent fixture and FAILS each drift it
                                        # catches, so a refactor can't silently weaken a check
@@ -102,7 +103,8 @@ shellcheck scripts/*.sh
                             # output (sorted, de-duplicated `<repo> <skill>`, scoped to ## Skills), that
                             # help/list are gh-free, and a missing/empty index fails loudly;
                             # also pins early argument validation, exact installation calls,
-                            # agent selection without glob expansion, and partial-failure reporting
+                            # agent selection without glob expansion, github.com host binding,
+                            # pre-install collision rejection, and partial-failure reporting
 ./scripts/check-upstream-skills.test.sh   # self-test of the upstream guard (also in the lint-scripts
                                           # gate): runs the REAL script against fixtures with an offline
                                           # `gh` stub (no network) — pins ## Skills scoping, Upstream

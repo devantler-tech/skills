@@ -100,6 +100,32 @@ make_root "$dup" <<'EOF'
 EOF
 expect_list "duplicate rows de-duplicate to one entry" "$dup" "fluxcd/agent-skills alpha"
 
+# GitHub repository identities are case-insensitive. An alias is still the same
+# source, not a destination collision, and must not cause two installations.
+alias_root="$tmp/repo-alias"
+make_root "$alias_root" <<'EOF'
+| `alpha` | [`Fixture/One`](https://github.com/Fixture/One/tree/main/alpha) | `gh skill install Fixture/One alpha` |
+| `alpha` | [`fixture/one`](https://github.com/fixture/one/tree/main/alpha) | `gh skill install fixture/one alpha` |
+EOF
+expect_list "repository casing aliases de-duplicate to one source" "$alias_root" 'Fixture/One alpha'
+
+# Locale-aware awk implementations distinguish I/i in Turkish. Exercise the
+# real parser under that locale when installed; hosts without it report a skip.
+locale_root="$tmp/locale-alias"
+make_root "$locale_root" <<'EOF'
+| `alpha` | [`OWNER/I`](https://github.com/OWNER/I/tree/main/alpha) | `gh skill install OWNER/I alpha` |
+| `alpha` | [`owner/i`](https://github.com/owner/i/tree/main/alpha) | `gh skill install owner/i alpha` |
+EOF
+turkish_locale=''
+if available_locales=$(locale -a 2>/dev/null); then
+  turkish_locale=$(printf '%s\n' "$available_locales" | LC_ALL=C awk 'tolower($0) ~ /^tr_tr\.(utf-8|utf8)$/ {print; exit}')
+fi
+if [ -n "$turkish_locale" ]; then
+  LC_ALL="$turkish_locale" expect_list "repository aliases are locale-independent" "$locale_root" 'OWNER/I alpha'
+else
+  printf '  SKIP Turkish locale is not installed; locale alias case not exercised\n'
+fi
+
 # 4. --list needs NEITHER gh NOR network. Run it with a gh shim on PATH that
 #    records its own invocation and exits non-zero: --list must still exit 0 with
 #    the right output AND never touch gh. This is the property CI alone can't
@@ -149,6 +175,7 @@ cat > "$ghbin/gh" <<'STUB'
 #!/usr/bin/env bash
 printf '<%s>' "$@" >> "$GH_CALLS"
 printf '\n' >> "$GH_CALLS"
+printf '%s\n' "${GH_HOST:-unset}" >> "$GH_HOSTS"
 if [ "$*" = 'skill --help' ]; then
   exit "${GH_UNAVAILABLE:-0}"
 fi
@@ -159,11 +186,13 @@ fi
 STUB
 export PATH="$ghbin:$PATH"
 export GH_CALLS="$tmp/calls"
+export GH_HOSTS="$tmp/hosts"
 unset AGENTS
 
 run_install() {
   local root="$1"; shift
   : > "$GH_CALLS"
+  : > "$GH_HOSTS"
   rc=0
   bash "$root/scripts/install.sh" "$@" > "$tmp/stdout" 2> "$tmp/stderr" || rc=$?
 }
@@ -203,6 +232,28 @@ run_install "$two" --list --help
 check 'help and listing cannot be combined' test "$rc" -eq 2
 check 'conflicting modes never call gh' test ! -s "$GH_CALLS"
 
+run_install "$alias_root" codex
+check 'repository casing aliases install successfully' test "$rc" -eq 0
+printf '<skill><--help>\n<skill><install><Fixture/One><alpha><--agent><codex><--scope><user><--force><--allow-hidden-dirs>\n' > "$tmp/expected"
+check 'repository casing aliases install only once' diff -u "$tmp/expected" "$GH_CALLS"
+
+# Different upstreams with the same destination name must be rejected before
+# even the gh preflight: --force would otherwise replace the first installation.
+collision="$tmp/collision"
+make_root "$collision" <<'EOF'
+| `alpha` | [`fixture/one`](https://github.com/fixture/one/tree/main/alpha) | `gh skill install fixture/one alpha` |
+| `alpha` | [`fixture/two`](https://github.com/fixture/two/tree/main/alpha) | `gh skill install fixture/two alpha` |
+EOF
+for mode in --list -l codex; do
+  run_install "$collision" "$mode"
+  check "colliding skill names fail in $mode mode" test "$rc" -eq 1
+  check 'collision reports the destination name' grep -q 'alpha' "$tmp/stderr"
+  check 'collision names the first upstream' grep -q 'fixture/one' "$tmp/stderr"
+  check 'collision names the second upstream' grep -q 'fixture/two' "$tmp/stderr"
+  check 'ambiguous catalogue never calls gh' test ! -s "$GH_CALLS"
+  check 'ambiguous catalogue emits no successful result' test ! -s "$tmp/stdout"
+done
+
 # Expected calls pin user scope and every existing install flag. The fixture has
 # two entries; positional arguments determine agents, not cwd filenames or AGENTS.
 expected_calls() {
@@ -217,6 +268,11 @@ expected_calls github-copilot claude-code > "$tmp/expected"
 run_install "$two"
 check 'default agents install successfully' test "$rc" -eq 0
 check 'defaults make exactly four intended installs' diff -u "$tmp/expected" "$GH_CALLS"
+GH_HOST=github.enterprise.test run_install "$two"
+check 'enterprise-default environment installs successfully' test "$rc" -eq 0
+check 'enterprise-default environment preserves installation arguments' diff -u "$tmp/expected" "$GH_CALLS"
+printf 'github.com\ngithub.com\ngithub.com\ngithub.com\ngithub.com\n' > "$tmp/expected-hosts"
+check 'preflight and every install target github.com' diff -u "$tmp/expected-hosts" "$GH_HOSTS"
 AGENTS='' run_install "$two"
 check 'empty AGENTS preserves defaults' diff -u "$tmp/expected" "$GH_CALLS"
 

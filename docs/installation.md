@@ -65,6 +65,16 @@ The script reads its install commands directly from the README catalogue. `--hel
 `--list` (`-l`) are standalone modes and need no authentication or network access. Do not combine
 them with agent names.
 
+All catalogue sources are on github.com. The script sets `GH_HOST=github.com` for
+its GitHub CLI calls, so an enterprise host in your environment does not redirect
+these installations. For a catalogue command run directly, prefix it with
+`GH_HOST=github.com` if your default host is an enterprise instance.
+
+Each installed skill name must identify one source repository. If the catalogue
+lists the same name from different repositories, installation and `--list` exit 1
+and name both sources before calling GitHub CLI. Repeated entries for the same
+repository and skill, including repository casing aliases, are installed once.
+
 Positional agent names override `AGENTS`. An unset or empty `AGENTS` uses the two default agents;
 otherwise, spaces, tabs, and newlines separate names without expanding wildcard characters into
 filenames. Unknown options, empty names, and whitespace-only `AGENTS` values fail with usage and

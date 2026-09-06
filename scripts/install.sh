@@ -24,6 +24,7 @@ Usage: install.sh [AGENT ...]
        install.sh --help | -h
 
 Install every README-listed skill at user scope for the selected agents.
+Catalogue sources are on github.com; installation overrides GH_HOST accordingly.
 Positional agents override the whitespace-separated AGENTS environment variable.
 Unset or empty AGENTS defaults to: github-copilot claude-code.
 
@@ -87,6 +88,7 @@ fi
 
 # Extract "<owner/repo> <skill>" from every `gh skill install <owner/repo> <skill>`
 # occurrence in the curated index, ignoring any trailing flags, and de-duplicate.
+# GitHub repository casing aliases identify the same source; skill names stay literal.
 # Scope the scan to the "## Skills" section (up to the next "## " heading) so
 # example commands elsewhere in the README — e.g. under "## Installing" — are
 # never picked up as installable entries. Parse before the gh check so `--list`
@@ -98,7 +100,8 @@ done < <(
   awk '/^## Skills[[:space:]]*$/{in_skills=1; next} /^## /{in_skills=0} in_skills' "$readme" \
     | grep -oE 'gh skill install [A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+ [A-Za-z0-9_.-]+' \
     | awk '{print $4, $5}' \
-    | sort -u
+    | LC_ALL=C sort -u \
+    | LC_ALL=C awk '!seen[tolower($1) SUBSEP $2]++'
 )
 
 if [ ${#entries[@]} -eq 0 ]; then
@@ -106,10 +109,28 @@ if [ ${#entries[@]} -eq 0 ]; then
   exit 1
 fi
 
+# gh installs by skill name within each agent directory. Distinct upstreams
+# sharing that name would overwrite each other under --force. Reject the whole
+# catalogue before listing or invoking gh, so CI and installation agree.
+collisions=$(printf '%s\n' "${entries[@]}" | awk '
+  $2 in sources && sources[$2] != $1 {
+    printf "error: skill name %s is shared by %s and %s\n", $2, sources[$2], $1
+  }
+  { sources[$2] = $1 }
+')
+if [ -n "$collisions" ]; then
+  printf '%s\n' "$collisions" >&2
+  exit 1
+fi
+
 if [ "$list_only" = true ]; then
   printf '%s\n' "${entries[@]}"
   exit 0
 fi
+
+# The curated index names github.com repositories, independent of the user's
+# default GitHub host. Keep both the preflight and every install on that host.
+export GH_HOST=github.com
 
 if ! gh skill --help >/dev/null 2>&1; then
   echo "error: 'gh skill' is unavailable. Install gh >= 2.90.0 first." >&2
