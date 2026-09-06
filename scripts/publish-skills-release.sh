@@ -76,18 +76,22 @@ done
 # and release call on that same host even when the caller sets GH_HOST.
 export GH_HOST=github.com
 
+# Ref names can contain URL syntax such as # or %. Encode the tag component
+# once for API paths; release commands and JSON comparisons keep the literal tag.
+tag_path=$(jq -rn --arg tag "$tag" '$tag | @uri') || exit 1
+
 # Does a git tag of this name exist on the remote? A read failure is fatal: it
 # leaves the publish precondition unknown, and an unknown precondition must never
 # be resolved by guessing in either direction.
 tag_ref_status=0
-gh api "repos/${repo}/git/ref/tags/${tag}" >/dev/null 2>&1 || tag_ref_status=$?
+gh api "repos/${repo}/git/ref/tags/${tag_path}" >/dev/null 2>&1 || tag_ref_status=$?
 
 if [ "$tag_ref_status" -eq 0 ]; then
   tag_exists=yes
 else
   # Distinguish "no such tag" (a clean 404) from an auth/network failure. Only the
   # former means the tag is absent; anything else leaves the answer unknown.
-  probe=$(gh api "repos/${repo}/git/ref/tags/${tag}" 2>&1 || true)
+  probe=$(gh api "repos/${repo}/git/ref/tags/${tag_path}" 2>&1 || true)
   case "$probe" in
     *"Not Found"* | *"HTTP 404"*) tag_exists=no ;;
     *)
@@ -112,6 +116,7 @@ if [ "$tag_exists" = no ]; then
     printf 'publish-skills-release: origin is unresolved; refusing publication.\n' >&2
     exit 1
   }
+  origin_url=$(printf '%s' "$origin_url" | LC_ALL=C tr '[:upper:]' '[:lower:]')
   case "$origin_url" in
     https://github.com/*) origin_repo=${origin_url#https://github.com/} ;;
     git@github.com:*) origin_repo=${origin_url#git@github.com:} ;;
@@ -122,8 +127,7 @@ if [ "$tag_exists" = no ]; then
       ;;
   esac
   origin_repo=${origin_repo%.git}
-  if [ "$(printf '%s' "$origin_repo" | tr '[:upper:]' '[:lower:]')" != \
-    "$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')" ]; then
+  if [ "$origin_repo" != "$(printf '%s' "$repo" | LC_ALL=C tr '[:upper:]' '[:lower:]')" ]; then
     printf 'publish-skills-release: origin differs from --repo; refusing publication.\n' >&2
     exit 1
   fi
@@ -162,7 +166,7 @@ fi
 # Resolve through the commits endpoint so annotated and lightweight tags both
 # yield the underlying commit, rather than comparing an annotated tag object's SHA.
 # Qualify the tag namespace so a same-named branch cannot satisfy the check.
-tag_commit=$(gh api "repos/${repo}/commits/tags/${tag}" --jq '.sha') || {
+tag_commit=$(gh api "repos/${repo}/commits/tags/${tag_path}" --jq '.sha') || {
   printf 'publish-skills-release: could not resolve tag %s to a commit; publication is unverified.\n' "$tag" >&2
   exit 1
 }

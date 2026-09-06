@@ -33,6 +33,7 @@ cases=0
 # Writes a `gh` stub that records publication in "$case_dir/published" and
 # answers the tag, commit, release, and validation paths as the case requires.
 make_stub() {
+  local release_tag="${6:-v1.0.0}" release_tag_path="${7:-v1.0.0}"
   case_dir="$work/$1"
   mkdir -p "$case_dir/bin"
   : >"$case_dir/published"
@@ -43,11 +44,11 @@ make_stub() {
 #!/usr/bin/env bash
 [ "\${GH_HOST:-}" = github.com ] || { echo 'wrong publication host' >&2; exit 1; }
 case "\$1 \$2" in
-  "api repos/owner/repo/commits/v1.0.0")
+  "api repos/owner/repo/commits/$release_tag_path")
     # An unqualified ref can resolve a same-named branch at the expected commit.
     echo '$fixture_commit'
     ;;
-  "api repos/owner/repo/commits/tags/v1.0.0")
+  "api repos/owner/repo/commits/tags/$release_tag_path")
     case "$5" in
       match) echo '$fixture_commit' ;;
       mismatch|branch-collision) echo '2222222222222222222222222222222222222222' ;;
@@ -55,7 +56,7 @@ case "\$1 \$2" in
       malformed) echo 'null' ;;
     esac
     ;;
-  "api repos/"*)
+  "api repos/owner/repo/git/ref/tags/$release_tag_path")
     case "$2" in
       found) exit 0 ;;
       missing) echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
@@ -63,8 +64,9 @@ case "\$1 \$2" in
     esac
     ;;
   "release view")
+    [ "\$3" = '$release_tag' ] || exit 1
     case "$3" in
-      published) echo '{"tagName":"v1.0.0","isDraft":false}' ;;
+      published) echo '{"tagName":"$release_tag","isDraft":false}' ;;
       draft) echo '{"tagName":"v1.0.0","isDraft":true}' ;;
       wrong-tag) echo '{"tagName":"v2.0.0","isDraft":false}' ;;
       ambiguous) printf '%s\n' '{"tagName":"v1.0.0","isDraft":false}' '{"tagName":"v1.0.0","isDraft":false}' ;;
@@ -82,7 +84,7 @@ case "\$1 \$2" in
     echo 'Validated'
     ;;
   "release create")
-    [ "\$*" = 'release create v1.0.0 --repo owner/repo --target $fixture_commit --generate-notes' ] || exit 1
+    [ "\$*" = 'release create $release_tag --repo owner/repo --target $fixture_commit --generate-notes' ] || exit 1
     echo "publish \$*" >>"$case_dir/published"
     case "$4" in
       ok) echo "Published" ;;
@@ -105,7 +107,8 @@ assert_case() {
   expected_published=$6
   cases=$((cases + 1))
 
-  case_dir=$(make_stub "$name" "$2" "$3" "$4" "${7:-match}")
+  test_tag=${10:-v1.0.0}
+  case_dir=$(make_stub "$name" "$2" "$3" "$4" "${7:-match}" "$test_tag" "${11:-v1.0.0}")
   invocation_dir="$case_dir/repo"
   case "${9:-match}" in
     wrong-repo) git -C "$case_dir/repo" remote set-url origin https://github.com/other/repo.git ;;
@@ -127,12 +130,15 @@ assert_case() {
     detached) git -C "$case_dir/repo" checkout -q --detach HEAD ;;
     ssh) git -C "$case_dir/repo" remote set-url origin git@github.com:owner/repo.git ;;
     ssh-url) git -C "$case_dir/repo" remote set-url origin ssh://git@github.com/owner/repo.git ;;
+    mixed-https) git -C "$case_dir/repo" remote set-url origin https://GitHub.com/Owner/Repo.git ;;
+    mixed-ssh) git -C "$case_dir/repo" remote set-url origin git@GitHub.com:Owner/Repo.git ;;
+    mixed-ssh-url) git -C "$case_dir/repo" remote set-url origin ssh://git@GitHub.com/Owner/Repo.git ;;
     foreign-host) git -C "$case_dir/repo" remote set-url origin https://example.test/owner/repo.git ;;
   esac
 
   actual_exit=0
   (cd "$invocation_dir" && GITHUB_SHA="${8-$fixture_commit}" GH_REPO=other/selection GH_HOST=example.test \
-    PATH="$case_dir/bin:$PATH" "$script" --tag v1.0.0 --repo owner/repo \
+    PATH="$case_dir/bin:$PATH" "$script" --tag "$test_tag" --repo owner/repo \
     >"$case_dir/out" 2>"$case_dir/err") || actual_exit=$?
 
   if [ -s "$case_dir/published" ]; then
@@ -165,9 +171,16 @@ assert_case() {
 
 # The ordinary release: nothing published yet, so it publishes.
 assert_case unpublished-publishes missing published ok 0 yes
+assert_case fragment-tag-publishes missing published ok 0 yes match "$fixture_commit" match 'v1.2.3#retry' 'v1.2.3%23retry'
+assert_case fragment-tag-rerun found published ok 0 no match "$fixture_commit" match 'v1.2.3#retry' 'v1.2.3%23retry'
+assert_case percent-tag-publishes missing published ok 0 yes match "$fixture_commit" match 'v1.2.3%23retry' 'v1.2.3%2523retry'
+assert_case slash-tag-publishes missing published ok 0 yes match "$fixture_commit" match 'release/v1.2.3' 'release%2Fv1.2.3'
 assert_case detached-checkout-publishes missing published ok 0 yes match "$fixture_commit" detached
 assert_case ssh-origin-publishes missing published ok 0 yes match "$fixture_commit" ssh
 assert_case ssh-url-origin-publishes missing published ok 0 yes match "$fixture_commit" ssh-url
+assert_case mixed-https-origin-publishes missing published ok 0 yes match "$fixture_commit" mixed-https
+assert_case mixed-ssh-origin-publishes missing published ok 0 yes match "$fixture_commit" mixed-ssh
+assert_case mixed-ssh-url-origin-publishes missing published ok 0 yes match "$fixture_commit" mixed-ssh-url
 assert_case wrong-checkout-repo-refuses missing published ok 1 no match "$fixture_commit" wrong-repo
 assert_case unresolved-checkout-repo-refuses missing published ok 1 no match "$fixture_commit" no-origin
 assert_case foreign-host-refuses missing published ok 1 no match "$fixture_commit" foreign-host

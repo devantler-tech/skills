@@ -153,6 +153,7 @@ github.com even when `GH_HOST` names another host. Hidden index flags (`assume-u
 from proving which files validation will read. The script validates with
 `gh skill publish --dry-run`, then creates the release with an explicit full commit target. Both new
 releases and completed reruns must pass remote tag-commit and matching non-draft release checks.
+Tag names are URL-encoded in API paths and retained literally in release commands and comparisons.
 An existing-tag race can ignore GitHub's requested target; the final checks detect that mismatch and
 fail instead of reporting success. This is a release operation. Pre-PR validation runs the hermetic
 `publish-skills-release.test.sh` above, which uses real temporary Git checkouts and an offline GitHub
