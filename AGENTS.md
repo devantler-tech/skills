@@ -24,6 +24,7 @@ scripts/
 ├── install.sh                  # Install every README-listed skill for one or more agents (user scope)
 ├── check-readme-index.sh       # lint-scripts gate: README ## Skills index ↔ on-disk skills + cross-column consistency
 ├── check-upstream-skills.sh    # 🔗 workflow: resolve each upstream index row against its source repo
+├── publish-skills-release.sh   # cd.yaml publish step: publish the tag, or report it already published
 └── *.test.sh                   # Hermetic self-test beside each script above (all in the lint-scripts gate)
 agent-instructions/             # In-house skill (each dir holds a conformant SKILL.md)
 conventional-release/           # In-house skill
@@ -105,6 +106,14 @@ shellcheck scripts/*.sh
                                           # `gh` stub (no network) — pins ## Skills scoping, Upstream
                                           # tree-URL parsing, fail-closed-on-no-rows, and hard-drift
                                           # (HTTP 404) vs transient-warning discrimination
+./scripts/publish-skills-release.sh --tag vX.Y.Z   # the release workflow's publish step: publishes
+                                                  # the tag, or reports it already published so the
+                                                  # steps after it can run on a re-run; refuses to
+                                                  # guess when the publish state is unreadable
+./scripts/publish-skills-release.test.sh   # self-test of the publish gate (also in the lint-scripts
+                                           # gate): drives the REAL script against a `gh` stub and
+                                           # pins BOTH the exit status and whether a publish actually
+                                           # happened, for each publish/skip/refuse case
 ./scripts/agent-improvement-contract.test.sh   # pins rate-hypothesis baseline comparability,
                                                # post-change evidence floors, writer-provenance gates,
                                                # and the state-metric carve-out

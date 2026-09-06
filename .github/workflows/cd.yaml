@@ -52,10 +52,13 @@ jobs:
           gh --version
 
       - name: 📦 Publish skills release
+        # Delegated to a script so the "already published" decision is testable: a job whose
+        # publish succeeded and whose later step failed must be re-runnable, and `gh skill
+        # publish` alone refuses the tag it just created. See scripts/publish-skills-release.sh.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
-        run: gh skill publish --tag "$TAG"
+        run: ./scripts/publish-skills-release.sh --tag "$TAG"
 
       - name: 🏷️ Verify the agent-skills discovery topic
         # `gh skill publish` offers to add the `agent-skills` topic only on its interactive
