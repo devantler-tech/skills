@@ -107,7 +107,8 @@ shellcheck scripts/*.sh
                                           # gate): runs the REAL script against fixtures with an offline
                                           # `gh` stub (no network) — pins ## Skills scoping, Upstream
                                           # tree-URL parsing, fail-closed-on-no-rows, and hard-drift
-                                          # (HTTP 404) vs transient-warning discrimination
+                                          # (HTTP 404), exact file-response validation, and bounded
+                                          # transport retries without misclassifying invalid payloads
 ./scripts/publish-skills-release.test.sh   # self-test of the publish gate (also in the lint-scripts
                                            # gate): drives the REAL script against a `gh` stub and
                                            # pins BOTH the exit status and whether a publish actually
@@ -126,7 +127,7 @@ shellcheck scripts/*.sh
 # 4. (local only) Lint changed workflows.
 actionlint
 
-# 5. Resolve every UPSTREAM index row against its source repo (needs gh auth / network).
+# 5. Resolve every UPSTREAM index row against its source repo (needs gh auth, jq, and network).
 #    Step 3 only proves the in-house self-pointers resolve on disk; this is the upstream half —
 #    it confirms each `gh skill install <owner/repo> <skill>` target still exists, the
 #    highest-blast-radius drift for this shared library. Run it after touching the index.
@@ -137,8 +138,10 @@ The required gate is the aggregated **`CI - Required Checks`** job (validate + d
 validate-spec + lint-scripts). `actionlint` and `check-upstream-skills.sh` are **not** part of it:
 `actionlint` is a local-only convenience, and the upstream-resolution check runs as the standalone
 scheduled **`🔗 Upstream skill targets`** workflow (weekly + on index-touch PRs) so a third-party
-outage never gates a contributor PR — it downgrades transient errors to warnings and fails only on real
-drift. (Its **offline self-test**, `check-upstream-skills.test.sh`, *is* in `lint-scripts` — it stubs
+outage never gates a contributor PR — it downgrades transport errors to warnings after bounded retries.
+HTTP 404 fails as drift; a successful response must identify the exact requested `SKILL.md` file or
+verification fails separately. Invalid payloads never count as healthy or transient.
+(Its **offline self-test**, `check-upstream-skills.test.sh`, *is* in `lint-scripts` — it stubs
 `gh`, so it pins the guard's parsing/discrimination logic with no network.) Never weaken a check to
 pass — fix the root cause.
 
