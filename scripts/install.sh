@@ -88,6 +88,7 @@ fi
 
 # Extract "<owner/repo> <skill>" from every `gh skill install <owner/repo> <skill>`
 # occurrence in the curated index, ignoring any trailing flags, and de-duplicate.
+# GitHub repository casing aliases identify the same source; skill names stay literal.
 # Scope the scan to the "## Skills" section (up to the next "## " heading) so
 # example commands elsewhere in the README — e.g. under "## Installing" — are
 # never picked up as installable entries. Parse before the gh check so `--list`
@@ -99,7 +100,8 @@ done < <(
   awk '/^## Skills[[:space:]]*$/{in_skills=1; next} /^## /{in_skills=0} in_skills' "$readme" \
     | grep -oE 'gh skill install [A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+ [A-Za-z0-9_.-]+' \
     | awk '{print $4, $5}' \
-    | sort -u
+    | LC_ALL=C sort -u \
+    | awk '!seen[tolower($1) SUBSEP $2]++'
 )
 
 if [ ${#entries[@]} -eq 0 ]; then

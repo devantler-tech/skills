@@ -100,6 +100,15 @@ make_root "$dup" <<'EOF'
 EOF
 expect_list "duplicate rows de-duplicate to one entry" "$dup" "fluxcd/agent-skills alpha"
 
+# GitHub repository identities are case-insensitive. An alias is still the same
+# source, not a destination collision, and must not cause two installations.
+alias_root="$tmp/repo-alias"
+make_root "$alias_root" <<'EOF'
+| `alpha` | [`Fixture/One`](https://github.com/Fixture/One/tree/main/alpha) | `gh skill install Fixture/One alpha` |
+| `alpha` | [`fixture/one`](https://github.com/fixture/one/tree/main/alpha) | `gh skill install fixture/one alpha` |
+EOF
+expect_list "repository casing aliases de-duplicate to one source" "$alias_root" 'Fixture/One alpha'
+
 # 4. --list needs NEITHER gh NOR network. Run it with a gh shim on PATH that
 #    records its own invocation and exits non-zero: --list must still exit 0 with
 #    the right output AND never touch gh. This is the property CI alone can't
@@ -205,6 +214,11 @@ done
 run_install "$two" --list --help
 check 'help and listing cannot be combined' test "$rc" -eq 2
 check 'conflicting modes never call gh' test ! -s "$GH_CALLS"
+
+run_install "$alias_root" codex
+check 'repository casing aliases install successfully' test "$rc" -eq 0
+printf '<skill><--help>\n<skill><install><Fixture/One><alpha><--agent><codex><--scope><user><--force><--allow-hidden-dirs>\n' > "$tmp/expected"
+check 'repository casing aliases install only once' diff -u "$tmp/expected" "$GH_CALLS"
 
 # Different upstreams with the same destination name must be rejected before
 # even the gh preflight: --force would otherwise replace the first installation.
