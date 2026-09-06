@@ -117,7 +117,8 @@ fi
 
 # Resolve through the commits endpoint so annotated and lightweight tags both
 # yield the underlying commit, rather than comparing an annotated tag object's SHA.
-tag_commit=$(gh api "repos/${repo}/commits/${tag}" --jq '.sha') || {
+# Qualify the tag namespace so a same-named branch cannot satisfy the check.
+tag_commit=$(gh api "repos/${repo}/commits/tags/${tag}" --jq '.sha') || {
   printf 'publish-skills-release: could not resolve tag %s to a commit; refusing to skip.\n' "$tag" >&2
   exit 1
 }

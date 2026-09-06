@@ -44,9 +44,13 @@ make_stub() {
 #!/usr/bin/env bash
 case "\$1 \$2" in
   "api repos/owner/repo/commits/v1.0.0")
+    # An unqualified ref can resolve a same-named branch at the expected commit.
+    echo '1111111111111111111111111111111111111111'
+    ;;
+  "api repos/owner/repo/commits/tags/v1.0.0")
     case "$5" in
       match) echo '1111111111111111111111111111111111111111' ;;
-      mismatch) echo '2222222222222222222222222222222222222222' ;;
+      mismatch|branch-collision) echo '2222222222222222222222222222222222222222' ;;
       unreadable) echo 'gh: connection refused' >&2; exit 1 ;;
       malformed) echo 'null' ;;
     esac
@@ -149,6 +153,7 @@ done
 
 # A release for a different commit must never satisfy this run's publication.
 assert_case different-commit-refuses found published ok 1 no mismatch
+assert_case branch-tag-collision-refuses found published ok 1 no branch-collision
 assert_case unreadable-commit-refuses found published ok 1 no unreadable
 assert_case malformed-commit-refuses found published ok 1 no malformed
 assert_case different-release-tag-refuses found wrong-tag ok 1 no
