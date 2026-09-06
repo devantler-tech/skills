@@ -100,7 +100,9 @@ shellcheck scripts/*.sh
                                        # catches, so a refactor can't silently weaken a check
 ./scripts/install.test.sh   # self-test of install.sh (also in the lint-scripts gate): pins --list/-l
                             # output (sorted, de-duplicated `<repo> <skill>`, scoped to ## Skills), that
-                            # --list is gh-free, and that a missing/empty index fails loudly
+                            # help/list are gh-free, and a missing/empty index fails loudly;
+                            # also pins early argument validation, exact installation calls,
+                            # agent selection without glob expansion, and partial-failure reporting
 ./scripts/check-upstream-skills.test.sh   # self-test of the upstream guard (also in the lint-scripts
                                           # gate): runs the REAL script against fixtures with an offline
                                           # `gh` stub (no network) — pins ## Skills scoping, Upstream
