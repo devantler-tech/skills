@@ -187,6 +187,15 @@ jobs:
         # against throwaway fixtures with a deterministic offline `gh` stub: no gh/network.
         run: ./scripts/check-upstream-skills.test.sh
 
+      - name: 🧪 Self-test the release publish gate
+        # publish-skills-release.sh decides whether `gh skill publish` runs at all. Both wrong
+        # answers are expensive — skipping a publish that never happened ships nothing while
+        # reporting success, and re-publishing an existing tag is the unrecoverable red release
+        # run this script ends (#106) — and neither is observable in CI, which always has a real
+        # gh and a real repository. Self-contained: drives the REAL script against a PATH-first
+        # gh stub and asserts both the exit status and whether a publish actually happened.
+        run: ./scripts/publish-skills-release.test.sh
+
   ci-required-checks:
     name: CI - Required Checks
     if: always()
