@@ -34,7 +34,7 @@ cases=0
 # make_stub <case> <tag-ref-behaviour> <release-behaviour> <publish-behaviour> <target>
 #
 # Writes a `gh` stub that records every `gh skill publish` invocation to
-# "$case_dir/published" and answers the two read paths as the case requires.
+# "$case_dir/published" and answers the three read paths as the case requires.
 make_stub() {
   case_dir="$work/$1"
   mkdir -p "$case_dir/bin"
@@ -80,6 +80,8 @@ STUB
 }
 
 # assert_case <name> <tag-ref> <release> <publish> <expected-exit> <expected-published:yes|no>
+# Run the release gate against one isolated stub and compare its exit status and
+# publish marker, accumulating failures so every case is exercised.
 assert_case() {
   name=$1
   expected_exit=$5
@@ -88,12 +90,10 @@ assert_case() {
 
   case_dir=$(make_stub "$name" "$2" "$3" "$4" "${7:-match}")
 
-  set +e
+  actual_exit=0
   GITHUB_SHA="${8-1111111111111111111111111111111111111111}" \
     PATH="$case_dir/bin:$PATH" "$script" --tag v1.0.0 --repo owner/repo \
-    >"$case_dir/out" 2>"$case_dir/err"
-  actual_exit=$?
-  set -e
+    >"$case_dir/out" 2>"$case_dir/err" || actual_exit=$?
 
   if [ -s "$case_dir/published" ]; then
     actual_published=yes
@@ -124,6 +124,29 @@ assert_case unpublished-publishes missing absent ok 0 yes
 # succeeded must SUCCEED WITHOUT re-publishing, so the steps after it can run.
 assert_case already-published-skips found published ok 0 no
 
+# A retry must reach the caller's remaining verification and preserve its result.
+# The child shell uses errexit, as the Actions runner does for successive steps.
+for verification_exit in 0 1; do
+  cases=$((cases + 1))
+  case_dir=$(make_stub "post-publish-$verification_exit" found published ok match)
+  actual_exit=0
+  GITHUB_SHA=1111111111111111111111111111111111111111 \
+    PATH="$case_dir/bin:$PATH" bash -ec '
+      "$1" --tag v1.0.0 --repo owner/repo
+      printf "verified\\n" >"$2/verified"
+      exit "$3"
+    ' _ "$script" "$case_dir" "$verification_exit" \
+    >"$case_dir/out" 2>"$case_dir/err" || actual_exit=$?
+  if [ "$actual_exit" -eq "$verification_exit" ] &&
+    [ -s "$case_dir/verified" ] && [ ! -s "$case_dir/published" ]; then
+    printf 'ok   post-publish-verification (exit %s, reached=yes, published=no)\n' "$actual_exit"
+  else
+    printf 'FAIL post-publish-verification: exit %s, want %s with verification reached and no publish\n' \
+      "$actual_exit" "$verification_exit" >&2
+    failures=$((failures + 1))
+  fi
+done
+
 # A release for a different commit must never satisfy this run's publication.
 assert_case different-commit-refuses found published ok 1 no mismatch
 assert_case unreadable-commit-refuses found published ok 1 no unreadable
@@ -150,10 +173,8 @@ assert_case unreadable-tag-state-fails broken absent ok 1 no
 
 # Usage errors are distinguishable from publish failures.
 cases=$((cases + 1))
-set +e
-"$script" --repo owner/repo >/dev/null 2>&1
-usage_exit=$?
-set -e
+usage_exit=0
+"$script" --repo owner/repo >/dev/null 2>&1 || usage_exit=$?
 if [ "$usage_exit" -eq 2 ]; then
   printf 'ok   missing-tag-is-usage-error (exit 2)\n'
 else

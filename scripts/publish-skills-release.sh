@@ -29,6 +29,7 @@
 # Usage: publish-skills-release.sh --tag <tag> [--repo <owner/repo>] [--expected-commit <sha>]
 set -euo pipefail
 
+# Print the supported arguments and exit-code contract to stderr without exiting.
 usage() {
   cat >&2 <<'USAGE'
 Usage: publish-skills-release.sh --tag <tag> [--repo <owner/repo>] [--expected-commit <sha>]
@@ -44,6 +45,8 @@ Exit codes:
 USAGE
 }
 
+# Report an invalid invocation, print usage, and exit with the usage-error status.
+# The first argument is the diagnostic to show before the usage text.
 die_usage() {
   printf 'publish-skills-release: %s\n\n' "$1" >&2
   usage
