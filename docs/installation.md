@@ -54,12 +54,25 @@ gh skill install devantler-tech/agent-skills ways-of-working --agent claude-code
 Run these commands from a clone of this repository:
 
 ```sh
+./scripts/install.sh --help                   # usage, without reading the catalogue or calling gh
+./scripts/install.sh --list                   # preview the catalogue without installing
 ./scripts/install.sh                          # both Copilot + Claude Code (user scope)
 ./scripts/install.sh claude-code              # just Claude Code
 AGENTS="github-copilot claude-code cursor" ./scripts/install.sh   # any gh skill agents
 ```
 
-The script reads its install commands directly from the README catalogue. To list them without installing anything, run `./scripts/install.sh --list`.
+The script reads its install commands directly from the README catalogue. `--help` (`-h`) and
+`--list` (`-l`) are standalone modes and need no authentication or network access. Do not combine
+them with agent names.
+
+Positional agent names override `AGENTS`. An unset or empty `AGENTS` uses the two default agents;
+otherwise, spaces, tabs, and newlines separate names without expanding wildcard characters into
+filenames. Unknown options, empty names, and whitespace-only `AGENTS` values fail with usage and
+exit code 2 before any installation starts. Supported agent names come from `gh skill install --help`.
+
+Installation uses user scope and replaces existing copies with `--force`. If an individual skill
+fails, the script prints its error, attempts the remaining installations, and exits 1 with the total
+failure count. A successful installation or preview exits 0.
 
 ## Automated installation and updates
 

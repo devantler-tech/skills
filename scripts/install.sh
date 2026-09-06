@@ -11,18 +11,70 @@
 #   ./scripts/install.sh github-copilot cursor # any gh skill agents
 #   AGENTS="github-copilot claude-code" ./scripts/install.sh
 #   ./scripts/install.sh --list                # print the parsed index and exit (no gh needed)
+#   ./scripts/install.sh --help                # show usage without reading the index
 #
 # Requires gh >= 2.90.0 (with `gh skill`). See `gh skill install --help`.
 # (`--list` only parses the README, so it needs neither gh nor network access.)
 set -euo pipefail
 
-# --list/-l: parse the README index and print the "<owner/repo> <skill>" entries,
-# then exit — without requiring gh, network, or auth. This lets CI smoke-test the
-# README parser (the load-bearing lockstep between the index and every consumer).
+usage() {
+  cat <<'EOF'
+Usage: install.sh [AGENT ...]
+       install.sh --list | -l
+       install.sh --help | -h
+
+Install every README-listed skill at user scope for the selected agents.
+Positional agents override the whitespace-separated AGENTS environment variable.
+Unset or empty AGENTS defaults to: github-copilot claude-code.
+
+--list, -l  Print the sorted skill index without installing (no gh needed).
+--help, -h  Show this help without reading the index or calling gh.
+Help and listing are standalone modes; do not combine them with agent arguments.
+
+Installation requires gh >= 2.90.0 with gh skill support. Agent names are passed
+to gh skill install; run gh skill install --help for supported agents.
+EOF
+}
+
+usage_error() {
+  printf 'error: %s\n' "$1" >&2
+  usage >&2
+  exit 2
+}
+
+# Inspect the whole invocation before gh or any installation can run.
 list_only=false
-if [ "${1:-}" = "--list" ] || [ "${1:-}" = "-l" ]; then
-  list_only=true
-  shift
+case "${1:-}" in
+  --help|-h)
+    [ "$#" -eq 1 ] || usage_error 'help must be used alone'
+    usage
+    exit 0
+    ;;
+  --list|-l)
+    [ "$#" -eq 1 ] || usage_error 'listing must be used alone'
+    list_only=true
+    ;;
+esac
+
+if [ "$list_only" = false ]; then
+  agents=()
+  if [ "$#" -gt 0 ]; then
+    agents=("$@")
+  else
+    # read splits on whitespace without pathname expansion, including each line
+    # of a multiline value. No catalogue of agent names is duplicated here.
+    while IFS=$' \t' read -r -a line_agents; do
+      if [ "${#line_agents[@]}" -gt 0 ]; then
+        agents+=("${line_agents[@]}")
+      fi
+    done <<< "${AGENTS:-github-copilot claude-code}"
+  fi
+  [ "${#agents[@]}" -gt 0 ] || usage_error 'select at least one agent'
+  for agent in "${agents[@]}"; do
+    case "$agent" in
+      ''|-*|*[[:space:]]*) usage_error "invalid agent argument: '$agent'" ;;
+    esac
+  done
 fi
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -62,14 +114,6 @@ fi
 if ! gh skill --help >/dev/null 2>&1; then
   echo "error: 'gh skill' is unavailable. Install gh >= 2.90.0 first." >&2
   exit 1
-fi
-
-# Agents: positional args win, else $AGENTS, else both Copilot and Claude Code.
-if [ "$#" -gt 0 ]; then
-  agents=("$@")
-else
-  # shellcheck disable=SC2206
-  agents=(${AGENTS:-github-copilot claude-code})
 fi
 
 echo "Installing ${#entries[@]} skill(s) for agent(s): ${agents[*]} (scope=user)"

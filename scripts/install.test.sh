@@ -144,8 +144,114 @@ make_root "$empty" <<'EOF'
 EOF
 expect_fail "zero parsed entries exits non-zero (## Installing not parsed)" "$empty" --list
 
+# Record argument boundaries, not a shell command that could expand wildcards.
+cat > "$ghbin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '<%s>' "$@" >> "$GH_CALLS"
+printf '\n' >> "$GH_CALLS"
+if [ "$*" = 'skill --help' ]; then
+  exit "${GH_UNAVAILABLE:-0}"
+fi
+if [ "${GH_FAIL_SKILL:-}" = "${4:-}" ]; then
+  echo 'fixture download failed' >&2
+  exit 1
+fi
+STUB
+export PATH="$ghbin:$PATH"
+export GH_CALLS="$tmp/calls"
+unset AGENTS
+
+run_install() {
+  local root="$1"; shift
+  : > "$GH_CALLS"
+  rc=0
+  bash "$root/scripts/install.sh" "$@" > "$tmp/stdout" 2> "$tmp/stderr" || rc=$?
+}
+
+check() {
+  local name="$1"; shift
+  if "$@"; then
+    printf '  ✅ %s\n' "$name"
+  else
+    printf '  ❌ %s\n' "$name"
+    fail=1
+  fi
+}
+
+for help in --help -h; do
+  run_install "$nordme" "$help"
+  check "$help works without a README" test "$rc" -eq 0
+  check "$help prints usage" grep -q '^Usage:' "$tmp/stdout"
+  check "$help never calls gh" test ! -s "$GH_CALLS"
+done
+
+for invalid in --unknown '' 'two agents'; do
+  run_install "$two" cursor "$invalid"
+  check "invalid trailing argument is a usage error: '$invalid'" test "$rc" -eq 2
+  check 'invalid arguments print usage' grep -q '^Usage:' "$tmp/stderr"
+  check 'all arguments are checked before gh' test ! -s "$GH_CALLS"
+done
+for mode in --list -l --help -h; do
+  run_install "$two" "$mode" cursor
+  check "$mode rejects extra agents" test "$rc" -eq 2
+  check "$mode with extra agents never calls gh" test ! -s "$GH_CALLS"
+  run_install "$two" cursor "$mode"
+  check "trailing $mode is rejected before gh" test "$rc" -eq 2
+  check "trailing $mode never calls gh" test ! -s "$GH_CALLS"
+done
+run_install "$two" --list --help
+check 'help and listing cannot be combined' test "$rc" -eq 2
+check 'conflicting modes never call gh' test ! -s "$GH_CALLS"
+
+# Expected calls pin user scope and every existing install flag. The fixture has
+# two entries; positional arguments determine agents, not cwd filenames or AGENTS.
+expected_calls() {
+  printf '<skill><--help>\n'
+  local agent
+  for agent in "$@"; do
+    printf '<skill><install><devantler-tech/agent-skills><beta><--agent><%s><--scope><user><--force><--allow-hidden-dirs>\n' "$agent"
+    printf '<skill><install><fluxcd/agent-skills><alpha><--agent><%s><--scope><user><--force><--allow-hidden-dirs>\n' "$agent"
+  done
+}
+expected_calls github-copilot claude-code > "$tmp/expected"
+run_install "$two"
+check 'default agents install successfully' test "$rc" -eq 0
+check 'defaults make exactly four intended installs' diff -u "$tmp/expected" "$GH_CALLS"
+AGENTS='' run_install "$two"
+check 'empty AGENTS preserves defaults' diff -u "$tmp/expected" "$GH_CALLS"
+
+expected_calls codex cursor > "$tmp/expected"
+AGENTS=ignored run_install "$two" codex cursor
+check 'positional agents override environment' diff -u "$tmp/expected" "$GH_CALLS"
+AGENTS=$'codex\t\n cursor' run_install "$two"
+check 'environment supports tabs and newlines' diff -u "$tmp/expected" "$GH_CALLS"
+
+# A wildcard must remain one literal agent argument even when files match it.
+expected_calls '*' > "$tmp/expected"
+AGENTS='*' run_install "$two"
+check 'environment agents do not undergo pathname expansion' diff -u "$tmp/expected" "$GH_CALLS"
+AGENTS=$' \t\n ' run_install "$two"
+check 'whitespace-only AGENTS is a usage error' test "$rc" -eq 2
+check 'empty agent selection never calls gh' test ! -s "$GH_CALLS"
+AGENTS='cursor --help' run_install "$two"
+check 'environment options are not agents' test "$rc" -eq 2
+check 'invalid environment never calls gh' test ! -s "$GH_CALLS"
+
+expected_calls codex cursor > "$tmp/expected"
+GH_FAIL_SKILL=beta run_install "$two" codex cursor
+check 'partial installation returns failure' test "$rc" -eq 1
+check 'partial failure still attempts every install' diff -u "$tmp/expected" "$GH_CALLS"
+check 'original failure diagnostic is preserved' grep -q 'fixture download failed' "$tmp/stderr"
+check 'failure count includes both affected agents' grep -q 'Done with 2 failure(s).' "$tmp/stderr"
+check 'unaffected skills still succeed' grep -q 'ok   \[cursor\] fluxcd/agent-skills alpha' "$tmp/stdout"
+
+GH_UNAVAILABLE=1 run_install "$two" codex
+check 'unavailable gh skill fails' test "$rc" -eq 1
+printf '<skill><--help>\n' > "$tmp/expected"
+check 'unsupported gh never reaches install' diff -u "$tmp/expected" "$GH_CALLS"
+
 if [ "$fail" -ne 0 ]; then
   printf '❌ install.sh self-test FAILED\n' >&2
   exit 1
 fi
-printf '✅ install.sh self-test passed (6 cases)\n'
+printf '✅ install.sh self-test passed\n'
