@@ -175,6 +175,9 @@ assert_case fragment-tag-publishes missing published ok 0 yes match "$fixture_co
 assert_case fragment-tag-rerun found published ok 0 no match "$fixture_commit" match 'v1.2.3#retry' 'v1.2.3%23retry'
 assert_case percent-tag-publishes missing published ok 0 yes match "$fixture_commit" match 'v1.2.3%23retry' 'v1.2.3%2523retry'
 assert_case slash-tag-publishes missing published ok 0 yes match "$fixture_commit" match 'release/v1.2.3' 'release%2Fv1.2.3'
+assert_case option-like-tag-refuses missing published ok 2 no match "$fixture_commit" match '--draft' '--draft'
+assert_case option-like-tag-rerun-refuses found published ok 2 no match "$fixture_commit" match '--draft' '--draft'
+assert_case target-option-tag-refuses missing published ok 2 no match "$fixture_commit" match '--target=main' '--target%3Dmain'
 assert_case detached-checkout-publishes missing published ok 0 yes match "$fixture_commit" detached
 assert_case ssh-origin-publishes missing published ok 0 yes match "$fixture_commit" ssh
 assert_case ssh-url-origin-publishes missing published ok 0 yes match "$fixture_commit" ssh-url
