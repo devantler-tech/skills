@@ -17,6 +17,7 @@ on:
 concurrency:
   group: publish-skills
   cancel-in-progress: false
+  queue: max
 
 permissions: {}
 
@@ -87,4 +88,3 @@ jobs:
               exit 1
               ;;
           esac
-
