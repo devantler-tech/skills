@@ -81,6 +81,20 @@ export GH_HOST=github.com
 # once for API paths; release commands and JSON comparisons keep the literal tag.
 tag_path=$(jq -rn --arg tag "$tag" '$tag | @uri') || exit 1
 
+# Verify the requested remote tag resolves to the expected commit. The commits
+# endpoint handles annotated tags; qualifying tags/ prevents branch collisions.
+verify_tag_commit() {
+  local tag_commit
+  tag_commit=$(gh api "repos/${repo}/commits/tags/${tag_path}" --jq '.sha') || {
+    printf 'publish-skills-release: could not resolve tag %s to a commit; publication is unverified.\n' "$tag" >&2
+    return 1
+  }
+  if ! [[ "$tag_commit" =~ ^[0-9a-f]{40}$ ]] || [ "$tag_commit" != "$expected_commit" ]; then
+    printf 'publish-skills-release: tag %s does not resolve to the expected release commit; publication is unverified.\n' "$tag" >&2
+    return 1
+  fi
+}
+
 # Does a git tag of this name exist on the remote? A read failure is fatal: it
 # leaves the publish precondition unknown, and an unknown precondition must never
 # be resolved by guessing in either direction.
@@ -120,8 +134,10 @@ if [ "$tag_exists" = no ]; then
   origin_url=$(printf '%s' "$origin_url" | LC_ALL=C tr '[:upper:]' '[:lower:]')
   case "$origin_url" in
     https://github.com/*) origin_repo=${origin_url#https://github.com/} ;;
+    https://github.com:443/*) origin_repo=${origin_url#https://github.com:443/} ;;
     git@github.com:*) origin_repo=${origin_url#git@github.com:} ;;
     ssh://git@github.com/*) origin_repo=${origin_url#ssh://git@github.com/} ;;
+    ssh://git@github.com:22/*) origin_repo=${origin_url#ssh://git@github.com:22/} ;;
     *)
       printf 'publish-skills-release: origin must identify the expected GitHub repository.\n' >&2
       exit 1
@@ -149,9 +165,9 @@ if [ "$tag_exists" = no ]; then
     exit 1
   fi
   checkout_status=$(git --no-replace-objects -c core.fsmonitor= --no-optional-locks \
-    status --porcelain=v1 --untracked-files=all) || exit 1
+    status --porcelain=v1 --untracked-files=all --ignored) || exit 1
   [ -z "$checkout_status" ] || {
-    printf 'publish-skills-release: checkout has uncommitted files; refusing publication.\n' >&2
+    printf 'publish-skills-release: checkout has uncommitted or ignored files; refusing publication.\n' >&2
     exit 1
   }
 
@@ -160,21 +176,21 @@ if [ "$tag_exists" = no ]; then
   # commit explicitly when creating the GitHub release. The topic check remains
   # the caller's responsibility, as on the skill CLI's non-interactive path.
   gh skill publish --dry-run
+  # Create-only ref reservation loses atomically if another publisher wins the
+  # tag after our absence probe. Never publish against that writer's tag. A
+  # failed release leaves the reserved tag for explicit operator recovery.
+  gh api "repos/${repo}/git/refs" --method POST \
+    -f "ref=refs/tags/${tag}" -f "sha=${expected_commit}" >/dev/null || {
+    printf 'publish-skills-release: could not reserve tag %s; refusing release creation.\n' "$tag" >&2
+    exit 1
+  }
+  verify_tag_commit
   printf 'publish-skills-release: %s is not published yet; publishing.\n' "$tag"
-  gh release create "$tag" --repo "$repo" --target "$expected_commit" --generate-notes
+  gh release create "$tag" --repo "$repo" --target "$expected_commit" --generate-notes --verify-tag
 fi
 
-# Resolve through the commits endpoint so annotated and lightweight tags both
-# yield the underlying commit, rather than comparing an annotated tag object's SHA.
-# Qualify the tag namespace so a same-named branch cannot satisfy the check.
-tag_commit=$(gh api "repos/${repo}/commits/tags/${tag_path}" --jq '.sha') || {
-  printf 'publish-skills-release: could not resolve tag %s to a commit; publication is unverified.\n' "$tag" >&2
-  exit 1
-}
-if ! [[ "$tag_commit" =~ ^[0-9a-f]{40}$ ]] || [ "$tag_commit" != "$expected_commit" ]; then
-  printf 'publish-skills-release: tag %s does not resolve to the expected release commit; publication is unverified.\n' "$tag" >&2
-  exit 1
-fi
+# Recheck after creation, and apply the same postcondition to completed reruns.
+verify_tag_commit
 
 # The tag exists. Only a real, non-draft release for it proves the publish
 # finished; a tag without one is a half-finished publish that needs a human.

@@ -147,15 +147,20 @@ pass — fix the root cause.
 
 The CD workflow runs `scripts/publish-skills-release.sh` with the workflow commit as the expected tag
 target. Fresh publication requires a clean repository-root checkout at that commit and an effective
-`origin` URL matching the requested github.com repository (HTTPS or Git SSH). All forge calls use
+`origin` URL matching the requested github.com repository (HTTPS or Git SSH, with optional explicit
+default ports 443 and 22 respectively). All forge calls use
 github.com even when `GH_HOST` names another host. Hidden index flags (`assume-unchanged` or
 `skip-worktree`, including sparse entries) are refused because they prevent the clean-tree check
-from proving which files validation will read. The script validates with
-`gh skill publish --dry-run`, then creates the release with an explicit full commit target. Both new
+from proving which files validation will read. Ignored files are also refused because the skill CLI
+can discover them independently of Git tracking. The script validates with
+`gh skill publish --dry-run`, reserves the tag using the create-only refs API, verifies its commit,
+then creates the release with an explicit full commit target and `--verify-tag`. Both new
 releases and completed reruns must pass remote tag-commit and matching non-draft release checks.
 Tag names are URL-encoded in API paths and retained literally in release commands and comparisons.
-An existing-tag race can ignore GitHub's requested target; the final checks detect that mismatch and
-fail instead of reporting success. This is a release operation. Pre-PR validation runs the hermetic
+Option-like tag names are rejected before forge calls. A competing tag creation loses the reservation
+before any release is created; later tag movement is detected by the final checks. A reserved tag
+without a completed release remains an explicit operator-recovery condition, never a successful rerun.
+This is a release operation. Pre-PR validation runs the hermetic
 `publish-skills-release.test.sh` above, which uses real temporary Git checkouts and an offline GitHub
 stub without publishing.
 

@@ -34,6 +34,7 @@ cases=0
 # answers the tag, commit, release, and validation paths as the case requires.
 make_stub() {
   local release_tag="${6:-v1.0.0}" release_tag_path="${7:-v1.0.0}"
+  local reserve_behavior="${8:-ok}"
   case_dir="$work/$1"
   mkdir -p "$case_dir/bin"
   : >"$case_dir/published"
@@ -44,11 +45,24 @@ make_stub() {
 #!/usr/bin/env bash
 [ "\${GH_HOST:-}" = github.com ] || { echo 'wrong publication host' >&2; exit 1; }
 case "\$1 \$2" in
+  "api repos/owner/repo/git/refs")
+    [ "\$*" = 'api repos/owner/repo/git/refs --method POST -f ref=refs/tags/$release_tag -f sha=$fixture_commit' ] || exit 1
+    [ "$reserve_behavior" != collision ] || { echo 'Reference already exists' >&2; exit 1; }
+    : >"$case_dir/reserved"
+    ;;
   "api repos/owner/repo/commits/$release_tag_path")
     # An unqualified ref can resolve a same-named branch at the expected commit.
     echo '$fixture_commit'
     ;;
   "api repos/owner/repo/commits/tags/$release_tag_path")
+    if [ -f "$case_dir/reserved" ] && [ ! -s "$case_dir/published" ]; then
+      case "$reserve_behavior" in
+        moved) echo '2222222222222222222222222222222222222222' ;;
+        unreadable) echo 'gh: connection refused' >&2; exit 1 ;;
+        *) echo '$fixture_commit' ;;
+      esac
+      exit 0
+    fi
     case "$5" in
       match) echo '$fixture_commit' ;;
       mismatch|branch-collision) echo '2222222222222222222222222222222222222222' ;;
@@ -84,7 +98,10 @@ case "\$1 \$2" in
     echo 'Validated'
     ;;
   "release create")
-    [ "\$*" = 'release create $release_tag --repo owner/repo --target $fixture_commit --generate-notes' ] || exit 1
+    if [ ! -f "$case_dir/reserved" ] || [ "\$*" != 'release create $release_tag --repo owner/repo --target $fixture_commit --generate-notes --verify-tag' ]; then
+      echo 'unsafe unreserved publish' >>"$case_dir/published"
+      exit 0
+    fi
     echo "publish \$*" >>"$case_dir/published"
     case "$4" in
       ok) echo "Published" ;;
@@ -105,10 +122,11 @@ assert_case() {
   name=$1
   expected_exit=$5
   expected_published=$6
+  expected_reserved=${13:-$expected_published}
   cases=$((cases + 1))
 
   test_tag=${10:-v1.0.0}
-  case_dir=$(make_stub "$name" "$2" "$3" "$4" "${7:-match}" "$test_tag" "${11:-v1.0.0}")
+  case_dir=$(make_stub "$name" "$2" "$3" "$4" "${7:-match}" "$test_tag" "${11:-v1.0.0}" "${12:-ok}")
   invocation_dir="$case_dir/repo"
   case "${9:-match}" in
     wrong-repo) git -C "$case_dir/repo" remote set-url origin https://github.com/other/repo.git ;;
@@ -118,6 +136,10 @@ assert_case() {
         -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -qm other --allow-empty ;;
     dirty) printf 'untracked skill\n' >"$case_dir/repo/SKILL.md" ;;
     tracked-dirty) printf 'changed\n' >>"$case_dir/repo/README.md" ;;
+    ignored-skill)
+      printf 'ignored/\n' >>"$case_dir/repo/.git/info/exclude"
+      mkdir "$case_dir/repo/ignored"
+      printf 'invalid skill\n' >"$case_dir/repo/ignored/SKILL.md" ;;
     assume-unchanged|skip-worktree)
       git -C "$case_dir/repo" update-index "--${9}" README.md
       printf 'hidden change\n' >>"$case_dir/repo/README.md" ;;
@@ -133,6 +155,8 @@ assert_case() {
     mixed-https) git -C "$case_dir/repo" remote set-url origin https://GitHub.com/Owner/Repo.git ;;
     mixed-ssh) git -C "$case_dir/repo" remote set-url origin git@GitHub.com:Owner/Repo.git ;;
     mixed-ssh-url) git -C "$case_dir/repo" remote set-url origin ssh://git@GitHub.com/Owner/Repo.git ;;
+    https-port) git -C "$case_dir/repo" remote set-url origin https://github.com:443/owner/repo.git ;;
+    ssh-port) git -C "$case_dir/repo" remote set-url origin ssh://git@github.com:22/owner/repo.git ;;
     foreign-host) git -C "$case_dir/repo" remote set-url origin https://example.test/owner/repo.git ;;
   esac
 
@@ -160,8 +184,16 @@ assert_case() {
     return
   fi
 
-  if grep -q 'unsafe branch-targeted publish' "$case_dir/published"; then
-    printf 'FAIL %s: publication did not explicitly target the expected commit\n' "$name" >&2
+  actual_reserved=no
+  [ ! -f "$case_dir/reserved" ] || actual_reserved=yes
+  if [ "$actual_reserved" != "$expected_reserved" ]; then
+    printf 'FAIL %s: reserved=%s, want %s\n' "$name" "$actual_reserved" "$expected_reserved" >&2
+    failures=$((failures + 1))
+    return
+  fi
+
+  if grep -q 'unsafe ' "$case_dir/published"; then
+    printf 'FAIL %s: publication did not reserve and explicitly target the expected commit\n' "$name" >&2
     failures=$((failures + 1))
     return
   fi
@@ -184,6 +216,12 @@ assert_case ssh-url-origin-publishes missing published ok 0 yes match "$fixture_
 assert_case mixed-https-origin-publishes missing published ok 0 yes match "$fixture_commit" mixed-https
 assert_case mixed-ssh-origin-publishes missing published ok 0 yes match "$fixture_commit" mixed-ssh
 assert_case mixed-ssh-url-origin-publishes missing published ok 0 yes match "$fixture_commit" mixed-ssh-url
+assert_case https-default-port-publishes missing published ok 0 yes match "$fixture_commit" https-port
+assert_case ssh-default-port-publishes missing published ok 0 yes match "$fixture_commit" ssh-port
+assert_case ignored-skill-refuses missing published ok 1 no match "$fixture_commit" ignored-skill
+assert_case tag-reservation-collision-refuses missing published ok 1 no match "$fixture_commit" match v1.0.0 v1.0.0 collision
+assert_case reserved-tag-moved-refuses missing published ok 1 no match "$fixture_commit" match v1.0.0 v1.0.0 moved yes
+assert_case reserved-tag-unreadable-refuses missing published ok 1 no match "$fixture_commit" match v1.0.0 v1.0.0 unreadable yes
 assert_case wrong-checkout-repo-refuses missing published ok 1 no match "$fixture_commit" wrong-repo
 assert_case unresolved-checkout-repo-refuses missing published ok 1 no match "$fixture_commit" no-origin
 assert_case foreign-host-refuses missing published ok 1 no match "$fixture_commit" foreign-host
