@@ -109,6 +109,23 @@ make_root "$alias_root" <<'EOF'
 EOF
 expect_list "repository casing aliases de-duplicate to one source" "$alias_root" 'Fixture/One alpha'
 
+# Locale-aware awk implementations distinguish I/i in Turkish. Exercise the
+# real parser under that locale when installed; hosts without it report a skip.
+locale_root="$tmp/locale-alias"
+make_root "$locale_root" <<'EOF'
+| `alpha` | [`OWNER/I`](https://github.com/OWNER/I/tree/main/alpha) | `gh skill install OWNER/I alpha` |
+| `alpha` | [`owner/i`](https://github.com/owner/i/tree/main/alpha) | `gh skill install owner/i alpha` |
+EOF
+turkish_locale=''
+if available_locales=$(locale -a 2>/dev/null); then
+  turkish_locale=$(printf '%s\n' "$available_locales" | LC_ALL=C awk 'tolower($0) ~ /^tr_tr\.(utf-8|utf8)$/ {print; exit}')
+fi
+if [ -n "$turkish_locale" ]; then
+  LC_ALL="$turkish_locale" expect_list "repository aliases are locale-independent" "$locale_root" 'OWNER/I alpha'
+else
+  printf '  SKIP Turkish locale is not installed; locale alias case not exercised\n'
+fi
+
 # 4. --list needs NEITHER gh NOR network. Run it with a gh shim on PATH that
 #    records its own invocation and exits non-zero: --list must still exit 0 with
 #    the right output AND never touch gh. This is the property CI alone can't

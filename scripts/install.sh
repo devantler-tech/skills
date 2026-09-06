@@ -101,7 +101,7 @@ done < <(
     | grep -oE 'gh skill install [A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+ [A-Za-z0-9_.-]+' \
     | awk '{print $4, $5}' \
     | LC_ALL=C sort -u \
-    | awk '!seen[tolower($1) SUBSEP $2]++'
+    | LC_ALL=C awk '!seen[tolower($1) SUBSEP $2]++'
 )
 
 if [ ${#entries[@]} -eq 0 ]; then
