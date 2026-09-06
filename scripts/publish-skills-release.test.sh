@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
 #
-# Self-test for publish-skills-release.sh — pins the one property the script
-# exists for and the three ways it must refuse to guess.
-#
-# The script decides whether `gh skill publish` should run at all. Getting that
-# decision wrong is expensive in both directions: skipping a publish that never
-# happened ships nothing while reporting success, and re-attempting a publish that
-# already happened is exactly the unrecoverable red run this script was written to
-# end (devantler-tech/agent-skills#106). Neither direction is observable from CI,
-# which always has a real gh and a real repository, so every case below drives the
-# script against a stubbed `gh` on PATH and asserts BOTH the exit status and
-# whether `gh skill publish` was actually invoked.
-#
-# Each case builds its own PATH-first stub directory and a marker file the stub
-# appends to, so "did it publish?" is a fact recorded by the stub rather than an
-# inference from output text.
+# Exercise release creation, completed reruns, and refusal boundaries using real
+# Git checkouts and an offline GitHub stub. Each case observes both exit status
+# and creation attempts, including the explicit repository, host, and SHA target.
 set -euo pipefail
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -28,28 +16,40 @@ script="$script_dir/publish-skills-release.sh"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# Real repositories exercise checkout identity, dirty files, and detached HEAD.
+# Only GitHub is replaced: no test can create a remote release.
+git init -q "$work/fixture"
+printf 'fixture\n' >"$work/fixture/README.md"
+git -C "$work/fixture" add README.md
+git -C "$work/fixture" -c user.name=Fixture -c user.email=fixture@example.test \
+  -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -qm fixture --allow-empty
+fixture_commit=$(git -C "$work/fixture" rev-parse HEAD)
+
 failures=0
 cases=0
 
 # make_stub <case> <tag-ref-behaviour> <release-behaviour> <publish-behaviour> <target>
 #
-# Writes a `gh` stub that records every `gh skill publish` invocation to
-# "$case_dir/published" and answers the three read paths as the case requires.
+# Writes a `gh` stub that records publication in "$case_dir/published" and
+# answers the tag, commit, release, and validation paths as the case requires.
 make_stub() {
   case_dir="$work/$1"
   mkdir -p "$case_dir/bin"
   : >"$case_dir/published"
+  git clone -q --no-hardlinks "$work/fixture" "$case_dir/repo"
+  git -C "$case_dir/repo" remote set-url origin https://github.com/owner/repo.git
 
   cat >"$case_dir/bin/gh" <<STUB
 #!/usr/bin/env bash
+[ "\${GH_HOST:-}" = github.com ] || { echo 'wrong publication host' >&2; exit 1; }
 case "\$1 \$2" in
   "api repos/owner/repo/commits/v1.0.0")
     # An unqualified ref can resolve a same-named branch at the expected commit.
-    echo '1111111111111111111111111111111111111111'
+    echo '$fixture_commit'
     ;;
   "api repos/owner/repo/commits/tags/v1.0.0")
     case "$5" in
-      match) echo '1111111111111111111111111111111111111111' ;;
+      match) echo '$fixture_commit' ;;
       mismatch|branch-collision) echo '2222222222222222222222222222222222222222' ;;
       unreadable) echo 'gh: connection refused' >&2; exit 1 ;;
       malformed) echo 'null' ;;
@@ -67,16 +67,29 @@ case "\$1 \$2" in
       published) echo '{"tagName":"v1.0.0","isDraft":false}' ;;
       draft) echo '{"tagName":"v1.0.0","isDraft":true}' ;;
       wrong-tag) echo '{"tagName":"v2.0.0","isDraft":false}' ;;
+      ambiguous) printf '%s\n' '{"tagName":"v1.0.0","isDraft":false}' '{"tagName":"v1.0.0","isDraft":false}' ;;
       absent) echo "release not found" >&2; exit 1 ;;
     esac
     ;;
   "skill publish")
+    if [ "\$*" = 'skill publish --tag v1.0.0' ]; then
+      echo 'unsafe branch-targeted publish' >>"$case_dir/published"
+      [ "$4" != fails ] || exit 1
+      exit 0
+    fi
+    [ "\$*" = 'skill publish --dry-run' ] || exit 1
+    [ "$4" != invalid ] || exit 1
+    echo 'Validated'
+    ;;
+  "release create")
+    [ "\$*" = 'release create v1.0.0 --repo owner/repo --target $fixture_commit --generate-notes' ] || exit 1
     echo "publish \$*" >>"$case_dir/published"
     case "$4" in
       ok) echo "Published" ;;
       fails) echo "gh: publish exploded" >&2; exit 1 ;;
     esac
     ;;
+  *) echo "unexpected gh command: \$*" >&2; exit 1 ;;
 esac
 STUB
   chmod +x "$case_dir/bin/gh"
@@ -93,11 +106,34 @@ assert_case() {
   cases=$((cases + 1))
 
   case_dir=$(make_stub "$name" "$2" "$3" "$4" "${7:-match}")
+  invocation_dir="$case_dir/repo"
+  case "${9:-match}" in
+    wrong-repo) git -C "$case_dir/repo" remote set-url origin https://github.com/other/repo.git ;;
+    no-origin) git -C "$case_dir/repo" remote remove origin ;;
+    wrong-commit)
+      git -C "$case_dir/repo" -c user.name=Fixture -c user.email=fixture@example.test \
+        -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -qm other --allow-empty ;;
+    dirty) printf 'untracked skill\n' >"$case_dir/repo/SKILL.md" ;;
+    tracked-dirty) printf 'changed\n' >>"$case_dir/repo/README.md" ;;
+    assume-unchanged|skip-worktree)
+      git -C "$case_dir/repo" update-index "--${9}" README.md
+      printf 'hidden change\n' >>"$case_dir/repo/README.md" ;;
+    staged-dirty)
+      printf 'changed\n' >>"$case_dir/repo/README.md"
+      git -C "$case_dir/repo" add README.md ;;
+    subdirectory)
+      mkdir -p "$case_dir/repo/nested"
+      invocation_dir="$case_dir/repo/nested" ;;
+    detached) git -C "$case_dir/repo" checkout -q --detach HEAD ;;
+    ssh) git -C "$case_dir/repo" remote set-url origin git@github.com:owner/repo.git ;;
+    ssh-url) git -C "$case_dir/repo" remote set-url origin ssh://git@github.com/owner/repo.git ;;
+    foreign-host) git -C "$case_dir/repo" remote set-url origin https://example.test/owner/repo.git ;;
+  esac
 
   actual_exit=0
-  GITHUB_SHA="${8-1111111111111111111111111111111111111111}" \
+  (cd "$invocation_dir" && GITHUB_SHA="${8-$fixture_commit}" GH_REPO=other/selection GH_HOST=example.test \
     PATH="$case_dir/bin:$PATH" "$script" --tag v1.0.0 --repo owner/repo \
-    >"$case_dir/out" 2>"$case_dir/err" || actual_exit=$?
+    >"$case_dir/out" 2>"$case_dir/err") || actual_exit=$?
 
   if [ -s "$case_dir/published" ]; then
     actual_published=yes
@@ -118,15 +154,46 @@ assert_case() {
     return
   fi
 
+  if grep -q 'unsafe branch-targeted publish' "$case_dir/published"; then
+    printf 'FAIL %s: publication did not explicitly target the expected commit\n' "$name" >&2
+    failures=$((failures + 1))
+    return
+  fi
+
   printf 'ok   %s (exit %s, published=%s)\n' "$name" "$actual_exit" "$actual_published"
 }
 
 # The ordinary release: nothing published yet, so it publishes.
-assert_case unpublished-publishes missing absent ok 0 yes
+assert_case unpublished-publishes missing published ok 0 yes
+assert_case detached-checkout-publishes missing published ok 0 yes match "$fixture_commit" detached
+assert_case ssh-origin-publishes missing published ok 0 yes match "$fixture_commit" ssh
+assert_case ssh-url-origin-publishes missing published ok 0 yes match "$fixture_commit" ssh-url
+assert_case wrong-checkout-repo-refuses missing published ok 1 no match "$fixture_commit" wrong-repo
+assert_case unresolved-checkout-repo-refuses missing published ok 1 no match "$fixture_commit" no-origin
+assert_case foreign-host-refuses missing published ok 1 no match "$fixture_commit" foreign-host
+assert_case wrong-checkout-commit-refuses missing published ok 1 no match "$fixture_commit" wrong-commit
+assert_case dirty-checkout-refuses missing published ok 1 no match "$fixture_commit" dirty
+assert_case tracked-dirty-checkout-refuses missing published ok 1 no match "$fixture_commit" tracked-dirty
+assert_case staged-dirty-checkout-refuses missing published ok 1 no match "$fixture_commit" staged-dirty
+assert_case assume-unchanged-refuses missing published ok 1 no match "$fixture_commit" assume-unchanged
+assert_case skip-worktree-refuses missing published ok 1 no match "$fixture_commit" skip-worktree
+assert_case subdirectory-refuses missing published ok 1 no match "$fixture_commit" subdirectory
+assert_case invalid-skills-refuse missing published invalid 1 no
+
+# A successful publisher exit is not evidence that the requested release exists.
+# Verify the same remote postconditions as a rerun before reporting success.
+assert_case published-wrong-commit-fails missing published ok 1 yes mismatch
+assert_case published-unreadable-commit-fails missing published ok 1 yes unreadable
+assert_case published-malformed-commit-fails missing published ok 1 yes malformed
+assert_case published-missing-release-fails missing absent ok 1 yes
+assert_case published-draft-release-fails missing draft ok 1 yes
+assert_case published-wrong-release-tag-fails missing wrong-tag ok 1 yes
+assert_case published-ambiguous-release-fails missing ambiguous ok 1 yes
 
 # The property this script exists for: a re-run of a job whose publish already
 # succeeded must SUCCEED WITHOUT re-publishing, so the steps after it can run.
 assert_case already-published-skips found published ok 0 no
+assert_case published-rerun-needs-no-checkout-identity found published ok 0 no match "$fixture_commit" wrong-repo
 
 # A retry must reach the caller's remaining verification and preserve its result.
 # The child shell uses errexit, as the Actions runner does for successive steps.
@@ -134,7 +201,7 @@ for verification_exit in 0 1; do
   cases=$((cases + 1))
   case_dir=$(make_stub "post-publish-$verification_exit" found published ok match)
   actual_exit=0
-  GITHUB_SHA=1111111111111111111111111111111111111111 \
+  GITHUB_SHA="$fixture_commit" \
     PATH="$case_dir/bin:$PATH" bash -ec '
       "$1" --tag v1.0.0 --repo owner/repo
       printf "verified\\n" >"$2/verified"

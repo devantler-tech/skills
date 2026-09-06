@@ -145,10 +145,18 @@ verification fails separately. Invalid payloads never count as healthy or transi
 `gh`, so it pins the guard's parsing/discrimination logic with no network.) Never weaken a check to
 pass — fix the root cause.
 
-The CD workflow runs `scripts/publish-skills-release.sh` to publish a release. It supplies the
-workflow commit as the expected tag target; an existing non-draft release is accepted only when its
-tag resolves to that commit. This is a release operation. Pre-PR validation runs the hermetic
-`publish-skills-release.test.sh` above, which does not publish.
+The CD workflow runs `scripts/publish-skills-release.sh` with the workflow commit as the expected tag
+target. Fresh publication requires a clean repository-root checkout at that commit and an effective
+`origin` URL matching the requested github.com repository (HTTPS or Git SSH). All forge calls use
+github.com even when `GH_HOST` names another host. Hidden index flags (`assume-unchanged` or
+`skip-worktree`, including sparse entries) are refused because they prevent the clean-tree check
+from proving which files validation will read. The script validates with
+`gh skill publish --dry-run`, then creates the release with an explicit full commit target. Both new
+releases and completed reruns must pass remote tag-commit and matching non-draft release checks.
+An existing-tag race can ignore GitHub's requested target; the final checks detect that mismatch and
+fail instead of reporting success. This is a release operation. Pre-PR validation runs the hermetic
+`publish-skills-release.test.sh` above, which uses real temporary Git checkouts and an offline GitHub
+stub without publishing.
 
 ## Maintenance (autonomous AI assistant)
 

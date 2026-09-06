@@ -53,9 +53,8 @@ jobs:
           gh --version
 
       - name: 📦 Publish skills release
-        # Delegated to a script so the "already published" decision is testable: a job whose
-        # publish succeeded and whose later step failed must be re-runnable, and `gh skill
-        # publish` alone refuses the tag it just created. See scripts/publish-skills-release.sh.
+        # Bind a clean checkout, validate skills, create the release at github.sha, and verify
+        # the remote result. Completed reruns skip creation after the same verification.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
@@ -63,8 +62,7 @@ jobs:
         run: ./scripts/publish-skills-release.sh --tag "$TAG" --expected-commit "$EXPECTED_COMMIT"
 
       - name: 🏷️ Verify the agent-skills discovery topic
-        # `gh skill publish` offers to add the `agent-skills` topic only on its interactive
-        # path; the non-interactive `--tag` path above never does, so a release alone leaves
+        # Release creation does not add the `agent-skills` topic, so a release alone leaves
         # the repository invisible to `gh skill search` topic discovery. This step cannot apply
         # the topic either: replacing repository topics needs the Administration permission,
         # which GITHUB_TOKEN never carries. Topics are owned declaratively in
