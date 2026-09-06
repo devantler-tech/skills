@@ -31,7 +31,7 @@ trap 'rm -rf "$work"' EXIT
 failures=0
 cases=0
 
-# make_stub <case> <tag-ref-behaviour> <release-behaviour> <publish-behaviour>
+# make_stub <case> <tag-ref-behaviour> <release-behaviour> <publish-behaviour> <target>
 #
 # Writes a `gh` stub that records every `gh skill publish` invocation to
 # "$case_dir/published" and answers the two read paths as the case requires.
@@ -43,6 +43,14 @@ make_stub() {
   cat >"$case_dir/bin/gh" <<STUB
 #!/usr/bin/env bash
 case "\$1 \$2" in
+  "api repos/owner/repo/commits/v1.0.0")
+    case "$5" in
+      match) echo '1111111111111111111111111111111111111111' ;;
+      mismatch) echo '2222222222222222222222222222222222222222' ;;
+      unreadable) echo 'gh: connection refused' >&2; exit 1 ;;
+      malformed) echo 'null' ;;
+    esac
+    ;;
   "api repos/"*)
     case "$2" in
       found) exit 0 ;;
@@ -54,6 +62,7 @@ case "\$1 \$2" in
     case "$3" in
       published) echo '{"tagName":"v1.0.0","isDraft":false}' ;;
       draft) echo '{"tagName":"v1.0.0","isDraft":true}' ;;
+      wrong-tag) echo '{"tagName":"v2.0.0","isDraft":false}' ;;
       absent) echo "release not found" >&2; exit 1 ;;
     esac
     ;;
@@ -77,10 +86,11 @@ assert_case() {
   expected_published=$6
   cases=$((cases + 1))
 
-  case_dir=$(make_stub "$name" "$2" "$3" "$4")
+  case_dir=$(make_stub "$name" "$2" "$3" "$4" "${7:-match}")
 
   set +e
-  PATH="$case_dir/bin:$PATH" "$script" --tag v1.0.0 --repo owner/repo \
+  GITHUB_SHA="${8-1111111111111111111111111111111111111111}" \
+    PATH="$case_dir/bin:$PATH" "$script" --tag v1.0.0 --repo owner/repo \
     >"$case_dir/out" 2>"$case_dir/err"
   actual_exit=$?
   set -e
@@ -113,6 +123,14 @@ assert_case unpublished-publishes missing absent ok 0 yes
 # The property this script exists for: a re-run of a job whose publish already
 # succeeded must SUCCEED WITHOUT re-publishing, so the steps after it can run.
 assert_case already-published-skips found published ok 0 no
+
+# A release for a different commit must never satisfy this run's publication.
+assert_case different-commit-refuses found published ok 1 no mismatch
+assert_case unreadable-commit-refuses found published ok 1 no unreadable
+assert_case malformed-commit-refuses found published ok 1 no malformed
+assert_case different-release-tag-refuses found wrong-tag ok 1 no
+assert_case missing-expected-commit-refuses found published ok 2 no match ''
+assert_case abbreviated-expected-commit-refuses found published ok 2 no match 1111111
 
 # A publish that genuinely fails must still fail. The skip path must never be
 # reachable in a way that masks a real publish error.

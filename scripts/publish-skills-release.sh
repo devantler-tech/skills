@@ -20,21 +20,22 @@
 #   not published yet  -> publish
 #   ambiguous          -> FAIL, and say what is ambiguous
 #
-# "Already published" is deliberately narrow: the tag exists AND a non-draft
-# release exists for it. A tag with no release is a half-finished publish, not a
-# finished one, so it fails rather than skipping — the caller must never read
+# "Already published" is deliberately narrow: the tag targets the expected
+# release commit AND a non-draft release exists for that tag. A tag with no release
+# is a half-finished publish, not a finished one, so it fails rather than skipping — the caller must never read
 # "skipped" as "published". A failure to READ either fact is likewise a failure,
 # never a skip: an unreadable precondition proves nothing.
 #
-# Usage: publish-skills-release.sh --tag <tag> [--repo <owner/repo>]
+# Usage: publish-skills-release.sh --tag <tag> [--repo <owner/repo>] [--expected-commit <sha>]
 set -euo pipefail
 
 usage() {
   cat >&2 <<'USAGE'
-Usage: publish-skills-release.sh --tag <tag> [--repo <owner/repo>]
+Usage: publish-skills-release.sh --tag <tag> [--repo <owner/repo>] [--expected-commit <sha>]
 
   --tag   the release tag to publish (required), e.g. v1.2.3
   --repo  the repository to inspect; defaults to $GITHUB_REPOSITORY
+  --expected-commit  full release commit SHA; defaults to $GITHUB_SHA
 
 Exit codes:
   0  the release is published (by this run, or already)
@@ -51,6 +52,7 @@ die_usage() {
 
 tag=''
 repo="${GITHUB_REPOSITORY:-}"
+expected_commit="${GITHUB_SHA:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -64,6 +66,11 @@ while [ "$#" -gt 0 ]; do
       repo="$2"
       shift 2
       ;;
+    --expected-commit)
+      [ "$#" -ge 2 ] || die_usage "--expected-commit needs a value"
+      expected_commit="$2"
+      shift 2
+      ;;
     -h | --help)
       usage
       exit 0
@@ -74,6 +81,7 @@ done
 
 [ -n "$tag" ] || die_usage "--tag is required"
 [ -n "$repo" ] || die_usage "--repo is required when GITHUB_REPOSITORY is unset"
+[[ "$expected_commit" =~ ^[0-9a-f]{40}$ ]] || die_usage "--expected-commit (or GITHUB_SHA) must be a full commit SHA"
 
 # Does a git tag of this name exist on the remote? A read failure is fatal: it
 # leaves the publish precondition unknown, and an unknown precondition must never
@@ -104,6 +112,17 @@ if [ "$tag_exists" = no ]; then
   exit 0
 fi
 
+# Resolve through the commits endpoint so annotated and lightweight tags both
+# yield the underlying commit, rather than comparing an annotated tag object's SHA.
+tag_commit=$(gh api "repos/${repo}/commits/${tag}" --jq '.sha') || {
+  printf 'publish-skills-release: could not resolve tag %s to a commit; refusing to skip.\n' "$tag" >&2
+  exit 1
+}
+if ! [[ "$tag_commit" =~ ^[0-9a-f]{40}$ ]] || [ "$tag_commit" != "$expected_commit" ]; then
+  printf 'publish-skills-release: tag %s does not resolve to the expected release commit; refusing to skip.\n' "$tag" >&2
+  exit 1
+fi
+
 # The tag exists. Only a real, non-draft release for it proves the publish
 # finished; a tag without one is a half-finished publish that needs a human.
 release_json=$(gh release view "$tag" --repo "$repo" --json tagName,isDraft 2>&1) || {
@@ -113,10 +132,9 @@ release_json=$(gh release view "$tag" --repo "$repo" --json tagName,isDraft 2>&1
   exit 1
 }
 
-is_draft=$(printf '%s' "$release_json" | jq -r '.isDraft')
-
-if [ "$is_draft" != false ]; then
-  printf 'publish-skills-release: tag %s exists on %s but its release is a draft, so the publish is unfinished. Publish or delete it, then re-run.\n' \
+if ! printf '%s' "$release_json" | jq -e --arg tag "$tag" \
+  'type == "object" and .tagName == $tag and .isDraft == false' >/dev/null; then
+  printf 'publish-skills-release: tag %s exists on %s but a matching non-draft release was not established; refusing to skip.\n' \
     "$tag" "$repo" >&2
   exit 1
 fi

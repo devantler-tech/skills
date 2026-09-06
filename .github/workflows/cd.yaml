@@ -58,7 +58,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
-        run: ./scripts/publish-skills-release.sh --tag "$TAG"
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: ./scripts/publish-skills-release.sh --tag "$TAG" --expected-commit "$EXPECTED_COMMIT"
 
       - name: 🏷️ Verify the agent-skills discovery topic
         # `gh skill publish` offers to add the `agent-skills` topic only on its interactive
