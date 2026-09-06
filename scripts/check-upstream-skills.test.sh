@@ -5,8 +5,8 @@
 # against its source repo, so it cannot run in the PR-blocking gate (a third-party
 # outage must never flake a contributor PR). But its parsing + control flow — which
 # `## Skills` rows it scopes to, how it extracts owner/repo/ref/path from an Upstream
-# tree URL, which failures are *hard drift* (HTTP 404) vs *transient warnings*
-# (anything else), and that it fails closed when the parser finds nothing — is pure
+# tree URL, which failures are *hard drift* (HTTP 404), invalid file responses, or
+# *transient warnings*, and that it fails closed when the parser finds nothing — is pure
 # offline logic that a refactor can silently break, rippling a wrong/skipped check
 # across every consumer of this shared library. This pins that logic.
 #
@@ -27,26 +27,51 @@ trap 'rm -rf "$tmp"' EXIT
 fail=0
 
 # A deterministic, offline `gh` stub. The script invokes only
-# `gh api repos/<owner>/<repo>/contents/<path>/SKILL.md?ref=<ref> --jq .name`
-# (stdout captured to /dev/null, stderr inspected for 'HTTP 404'). The stub keys its
+# `gh api repos/<owner>/<repo>/contents/<path>/SKILL.md?ref=<ref>`. The stub keys its
 # verdict off the repo slug embedded in the fixtures: a slug containing 'deleted'
 # returns a definitive 404 (hard drift); one containing 'flaky' returns a 5xx (a
 # persistent transient → retried then downgraded to a warning); anything else
-# resolves (exit 0). It mimics `gh`'s real error shape so the script's
+# returns a file response. It also supports the old inline jq form so the new
+# regression cases reproduce the old guard's false successes. It mimics `gh`'s real error shape so the script's
 # `grep -q 'HTTP 404'` discriminator is exercised for real.
 stub_bin="$tmp/bin"
 mkdir -p "$stub_bin"
 cat >"$stub_bin/gh" <<'STUB'
 #!/usr/bin/env bash
 target=""
+filter=""
 for a in "$@"; do
   case "$a" in repos/*/contents/*) target="$a" ;; esac
 done
+if [ "${3:-}" = --jq ]; then filter="$4"; fi
+printf '%s\n' "$target" >> "$UPSTREAM_CALL_LOG"
+path=${target#*/contents/}
+path=${path%%\?*}
 case "$target" in
   *deleted*) echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
   *flaky*)   echo "gh: Service Unavailable (HTTP 503)" >&2; exit 1 ;;
-  *)         echo "SKILL.md"; exit 0 ;;
+  *limited*) echo "gh: API rate limit exceeded (HTTP 403)" >&2; exit 1 ;;
+  *recover*)
+    if [ "$(grep -cF "$target" "$UPSTREAM_CALL_LOG")" -lt 3 ]; then
+      echo "gh: Service Unavailable (HTTP 503)" >&2; exit 1
+    fi ;;
 esac
+case "$target" in
+  *directory*) body='[]' ;;
+  *null-body*) body='null' ;;
+  *empty-body*) body='' ;;
+  *malformed*) body='not json' ;;
+  *wrong-name*) body=$(jq -nc --arg path "$path" '{type:"file",name:"OTHER.md",path:$path}') ;;
+  *wrong-path*) body='{"type":"file","name":"SKILL.md","path":"elsewhere/SKILL.md"}' ;;
+  *symlink*) body=$(jq -nc --arg path "$path" '{type:"symlink",name:"SKILL.md",path:$path}') ;;
+  *missing-type*) body=$(jq -nc --arg path "$path" '{name:"SKILL.md",path:$path}') ;;
+  *) body=$(jq -nc --arg path "$path" '{type:"file",name:"SKILL.md",path:$path}') ;;
+esac
+if [ -n "$filter" ]; then
+  printf '%s\n' "$body" | jq -r "$filter"
+else
+  printf '%s\n' "$body"
+fi
 STUB
 chmod +x "$stub_bin/gh"
 export PATH="$stub_bin:$PATH"
@@ -54,6 +79,7 @@ export PATH="$stub_bin:$PATH"
 # No-op the guard's transient-retry backoff so the persistent-5xx case runs
 # instantly (the script defaults this to the real `sleep`).
 export UPSTREAM_RETRY_SLEEP=true
+export UPSTREAM_CALL_LOG="$tmp/calls"
 
 run_guard() { # root
   bash "$1/scripts/check-upstream-skills.sh"
@@ -153,8 +179,50 @@ make_root "$c" <<'EOF'
 EOF
 pass_case "persistent 5xx is a transient warning, not drift (still exits 0)" "$c"
 
+# Successful transport must prove the requested file, not merely yield a zero status.
+# Each invalid target is accompanied by a real file to prove one bad response does not
+# hide the independent healthy result. Invalid payloads must not enter the retry loop.
+for shape in directory null-body empty-body malformed wrong-name wrong-path symlink missing-type; do
+  c="$tmp/$shape"
+  make_root "$c" <<EOF
+| alpha | [test/present](https://github.com/test/present/tree/main/skills/alpha) | install |
+| bad | [test/$shape](https://github.com/test/$shape/tree/main/skills/bad) | install |
+EOF
+  : > "$UPSTREAM_CALL_LOG"
+  rc=0
+  output=$(run_guard "$c" 2>&1) || rc=$?
+  if [ "$rc" -eq 1 ] && [[ "$output" == *'invalid-responses=1'* ]] \
+    && [[ "$output" == *'ok    test/present'* ]] \
+    && [[ "$output" != *"ok    test/$shape"* ]] \
+    && [ "$(grep -cF "repos/test/$shape/" "$UPSTREAM_CALL_LOG")" -eq 1 ]; then
+    printf '  ✅ %s response rejected without retry or false health\n' "$shape"
+  else
+    printf '  ❌ %s response was not rejected correctly (exit %s)\n%s\n' "$shape" "$rc" "$output"
+    fail=1
+  fi
+done
+
+for transport in flaky limited recover; do
+  c="$tmp/retry-$transport"
+  make_root "$c" <<EOF
+| alpha | [test/$transport](https://github.com/test/$transport/tree/main/skills/alpha) | install |
+EOF
+  : > "$UPSTREAM_CALL_LOG"
+  rc=0
+  output=$(run_guard "$c" 2>&1) || rc=$?
+  expected='transient-warnings=1'
+  [ "$transport" != recover ] || expected='transient-warnings=0'
+  if [ "$rc" -eq 0 ] && [[ "$output" == *"$expected"* ]] \
+    && [ "$(wc -l < "$UPSTREAM_CALL_LOG" | tr -d ' ')" -eq 3 ]; then
+    printf '  ✅ %s transport retains bounded retry behavior\n' "$transport"
+  else
+    printf '  ❌ %s transport retry contract failed\n%s\n' "$transport" "$output"
+    fail=1
+  fi
+done
+
 if [ "$fail" -ne 0 ]; then
   printf '❌ check-upstream-skills self-test FAILED\n' >&2
   exit 1
 fi
-printf '✅ check-upstream-skills self-test passed (6 cases)\n'
+printf '✅ check-upstream-skills self-test passed (17 cases)\n'

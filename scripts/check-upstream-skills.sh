@@ -22,8 +22,8 @@
 # (see .github/workflows/check-upstream-skills.yaml) and fails visibly on real
 # drift. To keep a transient GitHub blip from reporting *false* drift, network /
 # rate-limit / 5xx errors are retried and, if still failing, downgraded to a
-# ::warning:: (non-fatal); only a definitive "not found" (HTTP 404) is a hard
-# ::error:: failure.
+# ::warning:: (non-fatal). HTTP 404 is hard drift; a successful response that
+# does not identify the requested file is a separate hard verification failure.
 #
 # Assumes upstream tree URLs pin a single-segment ref (e.g. `main`), which every
 # current index row does; the ref is the first path segment after `/tree/`.
@@ -39,6 +39,10 @@ if ! command -v gh >/dev/null 2>&1; then
   echo "::error::'gh' is required to resolve upstream skill targets." >&2
   exit 1
 fi
+if ! command -v jq >/dev/null 2>&1; then
+  echo "::error::'jq' is required to validate upstream skill file responses." >&2
+  exit 1
+fi
 
 # Backoff command between transient-failure retries. Defaults to the real `sleep`
 # (production behaviour unchanged); the offline self-test overrides it to a no-op so
@@ -46,14 +50,22 @@ fi
 UPSTREAM_RETRY_SLEEP=${UPSTREAM_RETRY_SLEEP:-sleep}
 
 # Resolve one upstream skill target. Echoes nothing on success; on a definitive
-# miss returns 1 (hard drift); on persistent transient failure returns 2 (warn).
+# miss returns 1 (hard drift); on persistent transport failure returns 2 (warn);
+# on an invalid successful response returns 3 (verification failure).
 resolve_target() {
   local owner=$1 repo=$2 ref=$3 path=$4
   local attempt err
   for attempt in 1 2 3; do
-    if err=$(gh api "repos/$owner/$repo/contents/$path/SKILL.md?ref=$ref" \
-        --jq '.name' 2>&1 >/dev/null); then
-      return 0
+    if err=$(gh api "repos/$owner/$repo/contents/$path/SKILL.md?ref=$ref" 2>&1); then
+      # Validate after the API call so a directory or malformed payload cannot be
+      # mistaken for a transport error and downgraded to a transient warning.
+      if printf '%s' "$err" | jq -es --arg path "$path/SKILL.md" '
+        length == 1 and (.[0] | type == "object"
+          and .type == "file" and .name == "SKILL.md" and .path == $path)
+      ' >/dev/null 2>&1; then
+        return 0
+      fi
+      return 3
     fi
     # HTTP 404 = the path/skill genuinely no longer exists at this pointer.
     if printf '%s' "$err" | grep -q 'HTTP 404'; then
@@ -83,6 +95,7 @@ fi
 checked=0
 drift=0
 warned=0
+invalid=0
 while IFS= read -r row; do
   [ -n "$row" ] || continue
   url=$(printf '%s' "$row" | grep -oE 'https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/tree/[^ )]+' | head -n1)
@@ -113,6 +126,10 @@ while IFS= read -r row; do
         echo "::error::upstream skill target '$owner/$repo $path' (ref $ref) no longer resolves — no '$path/SKILL.md' on $ref. The README row points at a renamed/deleted upstream skill; every consumer's 'gh skill install' will fail."
         drift=1
         ;;
+      3)
+        echo "::error::could not establish upstream skill file '$owner/$repo $path/SKILL.md' (ref $ref): successful API response does not identify the expected file."
+        invalid=$((invalid + 1))
+        ;;
       *)
         echo "::warning::could not verify '$owner/$repo $path' (ref $ref) after retries — treating as transient (network/rate-limit), not drift. Last error: ${detail//$'\n'/ }"
         warned=$((warned + 1))
@@ -122,8 +139,12 @@ while IFS= read -r row; do
 done <<<"$rows"
 
 echo
-echo "Checked $checked upstream target(s); drift=$drift, transient-warnings=$warned."
+echo "Checked $checked upstream target(s); drift=$drift, transient-warnings=$warned, invalid-responses=$invalid."
 if [ "$drift" -ne 0 ]; then
   echo "::error::Upstream skill drift detected — fix the broken README index row(s) above."
+  exit 1
+fi
+if [ "$invalid" -ne 0 ]; then
+  echo "::error::Upstream skill verification failed — inspect the invalid file responses above."
   exit 1
 fi
