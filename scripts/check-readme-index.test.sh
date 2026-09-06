@@ -84,6 +84,15 @@ make_root "$good" "beta" <<'EOF'
 EOF
 pass_case "fully-consistent fixture" "$good"
 
+# Individually consistent columns must not hide two upstreams targeting one
+# installed directory. The shared parser rejects this before the count check.
+c="$tmp/colliding-names"
+make_root "$c" "" <<'EOF'
+| `alpha` | [`fixture/one`](https://github.com/fixture/one/tree/main/alpha) | `gh skill install fixture/one alpha` |
+| `alpha` | [`fixture/two`](https://github.com/fixture/two/tree/main/alpha) | `gh skill install fixture/two alpha` |
+EOF
+fail_case "distinct upstreams cannot share an installed skill name" "$c"
+
 # 1. Parser yields zero entries → the lockstep fails closed (install.sh --list
 #    exits non-zero, so the guard dies before its own checks). Models a Skills
 #    table whose only row has no valid `gh skill install` command.
@@ -167,4 +176,4 @@ if [ "$fail" -ne 0 ]; then
   printf '❌ check-readme-index self-test FAILED\n' >&2
   exit 1
 fi
-printf '✅ check-readme-index self-test passed (9 cases)\n'
+printf '✅ check-readme-index self-test passed (10 cases)\n'

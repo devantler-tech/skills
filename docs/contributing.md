@@ -25,7 +25,9 @@ assistant) applies the same bar:
   upstreams.
 - **Naming & category.** The row's skill slug matches the upstream skill name; place it under the
   best-fitting `## Skills` category, adding a new category only when a skill clearly fits none of the
-  existing ones.
+  existing ones. Each skill name identifies one source repository across the catalogue: two
+  upstreams with the same name would replace each other during batch installation, so the index
+  check rejects that collision. Choose one canonical source rather than listing both.
 - **Lockstep.** Every change updates the README `## Skills` tables — the **single source of truth**
   that `install.sh` and the `setup-`/`update-agent-skills` consumers parse. Never hand-maintain a
   parallel list; run [`./scripts/check-readme-index.sh`](../scripts/check-readme-index.sh) — the same gate CI enforces — before
